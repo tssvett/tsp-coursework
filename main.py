@@ -1,7 +1,5 @@
 import warnings
 
-import matplotlib.pyplot as plt
-import numpy as np
 import pandas as pd
 import statsmodels.api as sm
 from statsmodels.tsa.ar_model import AutoReg
@@ -11,9 +9,9 @@ from tabulate import tabulate  # Для красивого вывода табл
 
 warnings.filterwarnings('ignore')  # Игнорируем предупреждения
 
-
 import numpy as np
 import matplotlib.pyplot as plt
+
 
 def read_file(filepath: str = '10.txt') -> np.array:
     """Чтение данных из файла"""
@@ -22,12 +20,14 @@ def read_file(filepath: str = '10.txt') -> np.array:
         data = [float(line[0:8]) for line in file]
     return np.array(data)
 
+
 def calculate_statistics(data: np.array) -> tuple:
     """Вычисление выборочного среднего, исправленной дисперсии и стандартного отклонения"""
     mean_val = np.mean(data)
     variance = np.var(data, ddof=1)  # Несмещённая оценка
     std_dev = np.std(data, ddof=1)
     return mean_val, variance, std_dev
+
 
 def calculate_sample_correlation(data: np.array, max_lag: int) -> tuple:
     """
@@ -47,6 +47,7 @@ def calculate_sample_correlation(data: np.array, max_lag: int) -> tuple:
     r = R / variance
     return R, r
 
+
 def estimate_correlation_interval(ncf: np.array, threshold: float = 1 / np.e) -> int:
     """Оценка интервала корреляции по порогу"""
     for lag, value in enumerate(ncf):
@@ -54,12 +55,14 @@ def estimate_correlation_interval(ncf: np.array, threshold: float = 1 / np.e) ->
             return lag
     return len(ncf) - 1
 
+
 def print_correlation_table(R: np.array, ncf: np.array):
     """Вывод таблицы с корреляционной функцией и нормированной корреляционной функцией"""
     table_data = [[i, f"{R[i]:.4f}", f"{ncf[i]:.4f}"] for i in range(len(R))]
     headers = ["n", "КФ", "НКФ"]
     print("\nТаблица 1 – Первые значения выборочной КФ и НКФ")
     print(tabulate(table_data, headers=headers, tablefmt="grid", stralign="center", numalign="center"))
+
 
 def plot_process_fragment(process: np.array, points_to_plot: int = 150):
     """Визуализация фрагмента случайного процесса с линиями среднего и стандартного отклонения"""
@@ -80,12 +83,13 @@ def plot_process_fragment(process: np.array, points_to_plot: int = 150):
     plt.tight_layout()
     plt.show()
 
+
 def plot_normalized_correlation(lags: np.array, ncf: np.array, corr_interval: int):
     """Построение графика нормированной корреляционной функции с порогом и интервалом корреляции"""
     plt.figure(figsize=(10, 6))
     plt.stem(lags, ncf, basefmt=" ", use_line_collection=True)
     plt.axhline(0, color='black', linewidth=0.8)
-    plt.axhline(1/np.e, color='red', linestyle='--', label='Порог 1/e')
+    plt.axhline(1 / np.e, color='red', linestyle='--', label='Порог 1/e')
     plt.axvline(corr_interval, color='green', linestyle='--', label=f'Интервал корреляции = {corr_interval}')
     plt.xlabel('Сдвиг (лаг), k')
     plt.ylabel('Нормированная корреляционная функция')
@@ -94,6 +98,7 @@ def plot_normalized_correlation(lags: np.array, ncf: np.array, corr_interval: in
     plt.grid(True, linestyle=':', alpha=0.5)
     plt.tight_layout()
     plt.show()
+
 
 def control_point_1():
     max_lag = 10
@@ -123,6 +128,7 @@ def control_point_1():
     print(f"\nИнтервал корреляции: {corr_interval} отсчёта")
 
     return process
+
 
 def plot_process_fragment(process):
     """Визуализация фрагмента случайного процесса"""
@@ -202,7 +208,7 @@ def plot_ar_models(process: np.array, max_order: int = 3, max_lag: int = 10):
     """
     Строит график сравнения выборочной НКФ с теоретическими НКФ моделей АР
     """
-    empirical_ncf = calculate_normalized_correlation(process, max_lag)
+    _, empirical_ncf = calculate_sample_correlation(process, max_lag)
     lags = np.arange(0, max_lag + 1)
 
     plt.figure(figsize=(12, 6))
@@ -230,7 +236,7 @@ def print_ar_models_table(process: np.array, max_order: int = 3):
     df = pd.DataFrame(index=range(max_order + 1), columns=columns)
     df.index.name = 'M'
 
-    empirical_ncf = calculate_normalized_correlation(process, 10)  # max_lag=10 для ошибки
+    _, empirical_ncf = calculate_sample_correlation(process, 10)  # max_lag=10 для ошибки
 
     best_order = 0
     best_error = np.inf
@@ -240,22 +246,19 @@ def print_ar_models_table(process: np.array, max_order: int = 3):
         theoretical_ncf = theoretical_ar_ncf(coeffs, 10)
         error = np.mean((empirical_ncf - theoretical_ncf) ** 2)
 
-        if order == 0:
-            df.loc[order] = ['Unstable', 'Unstable', 'Unstable', 'Unstable', error]
-        else:
-            row_data = []
-            for i in range(1, 4):
-                row_data.append(f"{coeffs[i]:.6f}" if i <= order else "NaN")
-            row_data.extend([f"{coeffs[0]:.6f}", error])
-            df.loc[order] = row_data
+        row_data = []
+        for i in range(1, 4):
+            row_data.append(f"{coeffs[i]:.4f}" if i <= order else "NaN")
+        row_data.extend([f"{coeffs[0]:.4f}", error])
+        df.loc[order] = row_data
 
         if error < best_error:
             best_error = error
             best_order = order
 
     print("\nТаблица коэффициентов моделей АР и ошибок:")
-    print(tabulate(df, headers='keys', tablefmt='grid', floatfmt=".6f"))
-    print(f"\nЛучшая модель: АР({best_order}) с ошибкой {best_error:.6f}")
+    print(tabulate(df, headers='keys', tablefmt='grid', floatfmt=".4f"))
+    print(f"\nЛучшая модель: АР({best_order}) с ошибкой {best_error:.4f}")
 
 
 def control_point_2():
@@ -306,7 +309,7 @@ def plot_ma_models(process: np.array, max_order: int = 3, max_lag: int = 10):
     """
     Строит график сравнения выборочной НКФ с теоретическими НКФ моделей СС
     """
-    empirical_ncf = calculate_normalized_correlation(process, max_lag)
+    _, empirical_ncf = calculate_sample_correlation(process, max_lag)
     lags = np.arange(0, max_lag + 1)
 
     plt.figure(figsize=(12, 6))
@@ -337,7 +340,7 @@ def print_ma_models_table(process: np.array, max_order: int = 3):
         'Погрешность модели'
     ])
 
-    empirical_ncf = calculate_normalized_correlation(process, 10)
+    _, empirical_ncf = calculate_sample_correlation(process, 10)
     best_error = np.inf
     best_order = None
 
@@ -421,7 +424,7 @@ def fit_arma_model(process: np.array, ar_order: int, ma_order: int) -> tuple:
 
         # Расчет ошибки через сравнение НКФ
         theoretical_ncf = theoretical_arma_ncf(ar_coeffs, ma_coeffs, 10)
-        empirical_ncf = calculate_normalized_correlation(process, 10)
+        _, empirical_ncf = calculate_sample_correlation(process, 10)
         error = np.mean((empirical_ncf - theoretical_ncf) ** 2)
 
         return ar_coeffs, ma_coeffs, intercept, error
@@ -520,7 +523,7 @@ def plot_best_nkf(process, ar_coeffs, ma_coeffs, best_m, best_n):
     """
     Визуализация сравнения НКФ для лучшей модели
     """
-    empirical_ncf = calculate_normalized_correlation(process, 10)
+    _, empirical_ncf = calculate_sample_correlation(process, 10)
     theoretical_ncf = theoretical_arma_ncf(ar_coeffs, ma_coeffs, 10)
     lags = np.arange(0, 11)
 
@@ -554,7 +557,7 @@ def control_point_4():
 
 
 if __name__ == '__main__':
-    control_point_1()
-    #control_point_2()
-    #control_point_3()
-    #control_point_4()
+    # control_point_1()
+    control_point_2()
+    # control_point_3()
+    # control_point_4()
