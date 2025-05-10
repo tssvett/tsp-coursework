@@ -12,57 +12,117 @@ from tabulate import tabulate  # Для красивого вывода табл
 warnings.filterwarnings('ignore')  # Игнорируем предупреждения
 
 
-def read_file() -> np.array:
+import numpy as np
+import matplotlib.pyplot as plt
+
+def read_file(filepath: str = '10.txt') -> np.array:
     """Чтение данных из файла"""
-    with open('10.txt', 'r', encoding='utf-8') as file:
+    with open(filepath, 'r', encoding='utf-8') as file:
         file.readline()  # Пропускаем заголовок
         data = [float(line[0:8]) for line in file]
     return np.array(data)
 
-
 def calculate_statistics(data: np.array) -> tuple:
-    """Вычисление статистических характеристик"""
+    """Вычисление выборочного среднего, исправленной дисперсии и стандартного отклонения"""
     mean_val = np.mean(data)
-    variance = np.var(data, ddof=0)
-    std_dev = np.std(data, ddof=0)
+    variance = np.var(data, ddof=1)  # Несмещённая оценка
+    std_dev = np.std(data, ddof=1)
     return mean_val, variance, std_dev
 
-
-def calculate_normalized_correlation(data: np.array, max_lag: int = 100) -> np.array:
-    """Вычисление нормированной корреляционной функции"""
-    centered = data - np.mean(data)
-    correlation = np.correlate(centered, centered, mode='full')
-    correlation = correlation[correlation.size // 2:correlation.size // 2 + max_lag + 1]
-    return correlation / correlation[0]
-
+def calculate_sample_correlation(data: np.array, max_lag: int) -> tuple:
+    """
+    Вычисление выборочной корреляционной функции (КФ) и нормированной КФ (НКФ)
+    с использованием исправленной формулы.
+    """
+    n = len(data)
+    mean_val = np.mean(data)
+    variance = np.var(data, ddof=1)
+    R = []
+    for k in range(max_lag + 1):
+        numerator = sum((data[j] - mean_val) * (data[j + k] - mean_val) for j in range(n - k))
+        denominator = n - k - 1
+        R_k = numerator / denominator
+        R.append(R_k)
+    R = np.array(R)
+    r = R / variance
+    return R, r
 
 def estimate_correlation_interval(ncf: np.array, threshold: float = 1 / np.e) -> int:
-    """Оценка интервала корреляции"""
+    """Оценка интервала корреляции по порогу"""
     for lag, value in enumerate(ncf):
         if value < threshold:
             return lag
     return len(ncf) - 1
 
+def print_correlation_table(R: np.array, ncf: np.array):
+    """Вывод таблицы с корреляционной функцией и нормированной корреляционной функцией"""
+    table_data = [[i, f"{R[i]:.4f}", f"{ncf[i]:.4f}"] for i in range(len(R))]
+    headers = ["n", "КФ", "НКФ"]
+    print("\nТаблица 1 – Первые значения выборочной КФ и НКФ")
+    print(tabulate(table_data, headers=headers, tablefmt="grid", stralign="center", numalign="center"))
+
+def plot_process_fragment(process: np.array, points_to_plot: int = 150):
+    """Визуализация фрагмента случайного процесса с линиями среднего и стандартного отклонения"""
+    mean_value = np.mean(process)
+    std_dev = np.std(process, ddof=1)
+
+    plt.figure(figsize=(10, 6))
+    plt.plot(process[:points_to_plot], label='Случайный процесс', color='blue', alpha=0.7)
+    plt.axhline(mean_value, color='orange', label=f'Среднее = {mean_value:.3f}', linewidth=2)
+    plt.axhline(mean_value + std_dev, color='green', linestyle='--', label=f'Среднее + σ = {mean_value + std_dev:.3f}')
+    plt.axhline(mean_value - std_dev, color='red', linestyle='--', label=f'Среднее - σ = {mean_value - std_dev:.3f}')
+    plt.ylabel('Значение процесса')
+    plt.xlabel('Время, отсчёты')
+    plt.title('Анализ случайного процесса')
+    plt.legend(loc='upper right')
+    plt.grid(True, linestyle=':', alpha=0.5)
+    plt.ylim(mean_value - 3 * std_dev, mean_value + 3 * std_dev)
+    plt.tight_layout()
+    plt.show()
+
+def plot_normalized_correlation(lags: np.array, ncf: np.array, corr_interval: int):
+    """Построение графика нормированной корреляционной функции с порогом и интервалом корреляции"""
+    plt.figure(figsize=(10, 6))
+    plt.stem(lags, ncf, basefmt=" ", use_line_collection=True)
+    plt.axhline(0, color='black', linewidth=0.8)
+    plt.axhline(1/np.e, color='red', linestyle='--', label='Порог 1/e')
+    plt.axvline(corr_interval, color='green', linestyle='--', label=f'Интервал корреляции = {corr_interval}')
+    plt.xlabel('Сдвиг (лаг), k')
+    plt.ylabel('Нормированная корреляционная функция')
+    plt.title('Нормированная корреляционная функция процесса')
+    plt.legend()
+    plt.grid(True, linestyle=':', alpha=0.5)
+    plt.tight_layout()
+    plt.show()
 
 def control_point_1():
-    """Пункт 3.1: Анализ исходного процесса"""
+    max_lag = 10
+    # Чтение данных
     process = read_file()
+
+    # Вычисление статистик
     mean_val, variance, std_dev = calculate_statistics(process)
     print(f"Выборочное среднее: {mean_val:.4f}")
-    print(f"Выборочная дисперсия: {variance:.4f}")
+    print(f"Выборочная дисперсия (исправленная): {variance:.4f}")
     print(f"Стандартное отклонение: {std_dev:.4f}")
 
-    # plot_process_fragment(process)
+    # Визуализация процесса
+    plot_process_fragment(process)
 
-    max_lag = 10
-    ncf = calculate_normalized_correlation(process, max_lag)
+    # Вычисление корреляционных функций
+    R, ncf = calculate_sample_correlation(process, max_lag)
     corr_interval = estimate_correlation_interval(ncf)
 
-    # plot_normalized_correlation(lags, ncf, corr_interval)
-    print(f"Интервал корреляции: {corr_interval} отсчёта")
+    # Вывод таблицы с КФ и НКФ
+    print_correlation_table(R, ncf)
+
+    # Визуализация нормированной корреляционной функции
+    lags = np.arange(max_lag + 1)
+    plot_normalized_correlation(lags, ncf, corr_interval)
+
+    print(f"\nИнтервал корреляции: {corr_interval} отсчёта")
 
     return process
-
 
 def plot_process_fragment(process):
     """Визуализация фрагмента случайного процесса"""
@@ -268,38 +328,70 @@ def plot_ma_models(process: np.array, max_order: int = 3, max_lag: int = 10):
 
 def print_ma_models_table(process: np.array, max_order: int = 3):
     """
-    Выводит таблицу с коэффициентами моделей СС и ошибками
+    Выводит таблицу моделей скользящего среднего в формате методички
     """
-    columns = ['θ1', 'θ2', 'θ3', 'A0', 'error']
-    df = pd.DataFrame(index=range(max_order + 1), columns=columns)
-    df.index.name = 'N'
+    # Создаем DataFrame с нужными колонками
+    df = pd.DataFrame(columns=[
+        'Порядок модели',
+        'Параметры модели',
+        'Погрешность модели'
+    ])
 
     empirical_ncf = calculate_normalized_correlation(process, 10)
-
-    best_order = 0
     best_error = np.inf
+    best_order = None
 
     for order in range(max_order + 1):
-        coeffs, noise_var = fit_ma_model(process, order)
-        theoretical_ncf = theoretical_ma_ncf(coeffs, 10)
-        error = np.mean((empirical_ncf - theoretical_ncf) ** 2)
+        try:
+            # Пытаемся построить модель
+            coeffs, noise_var = fit_ma_model(process, order)
 
-        if order == 0:
-            df.loc[order] = ['Unstable', 'Unstable', 'Unstable', 'Unstable', error]
-        else:
-            row_data = []
-            for i in range(3):
-                row_data.append(f"{coeffs[i]:.6f}" if i < order else "NaN")
-            row_data.extend([f"{noise_var:.6f}", error])
-            df.loc[order] = row_data
+            # Проверяем обратимость
+            if not check_invertibility(coeffs):
+                raise ValueError("Модель необратима")
 
-        if error < best_error:
-            best_error = error
-            best_order = order
+            # Рассчитываем теоретическую НКФ и ошибку
+            theoretical_ncf = theoretical_ma_ncf(coeffs, 10)
+            error = np.mean((empirical_ncf - theoretical_ncf) ** 2)
 
-    print("\nТаблица коэффициентов моделей СС и ошибок:")
-    print(tabulate(df, headers='keys', tablefmt='grid', floatfmt=".6f"))
-    print(f"\nЛучшая модель: СС({best_order}) с ошибкой {best_error:.6f}")
+            # Форматируем параметры
+            params = ' '.join([f"{c:.4f}" for c in coeffs]) if len(coeffs) > 0 else "–"
+
+            # Добавляем строку в таблицу
+            df.loc[order] = [
+                f"СС({order})",
+                params,
+                f"{error:.5f}"
+            ]
+
+            # Обновляем лучшую модель
+            if error < best_error:
+                best_error = error
+                best_order = order
+
+        except Exception as e:
+            # Для несуществующих моделей
+            df.loc[order] = [
+                f"СС({order})",
+                "Модель не существует",
+                "–"
+            ]
+
+    # Вывод таблицы
+    print("\nТаблица моделей скользящего среднего:")
+    print(tabulate(
+        df,
+        headers='keys',
+        tablefmt='grid',
+        showindex=False,
+        stralign="center",
+        numalign="center"
+    ))
+
+    if best_order is not None:
+        print(f"\nРекомендуемая модель: СС({best_order}) с погрешностью {best_error:.5f}")
+    else:
+        print("\nНевозможно построить работоспособную модель СС")
 
 
 def control_point_3():
@@ -463,6 +555,6 @@ def control_point_4():
 
 if __name__ == '__main__':
     control_point_1()
-    control_point_2()
-    control_point_3()
-    control_point_4()
+    #control_point_2()
+    #control_point_3()
+    #control_point_4()
