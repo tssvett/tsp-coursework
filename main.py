@@ -269,295 +269,104 @@ def control_point_2():
     print_ar_models_table(process)
 
 
-def fit_ma_model(process: np.array, order: int) -> tuple:
-    """
-    Подгонка модели СС(N) методом максимума правдоподобия
-    Возвращает коэффициенты и дисперсию шума
-    """
-    model = sm.tsa.SARIMAX(process, order=(0, 0, order), trend='c')
-    results = model.fit(disp=False)
-    coefficients = results.params[:-1]  # Игнорируем дисперсию шума
-    noise_variance = results.params[-1]
-    return coefficients, noise_variance
+def solve_ma_system(R, order):
+    """Решает систему уравнений для параметров СС(N) модели"""
+    from scipy.optimize import fsolve
+    import numpy as np
+
+    def equations(params):
+        eqs = []
+        alpha = params
+        # Уравнения для корреляционной функции
+        for k in range(order + 1):
+            sum_ = 0.0
+            for j in range(order + 1 - k):
+                sum_ += alpha[j] * alpha[j + k]
+            eqs.append(sum_ - R[k])
+        return eqs
+
+    # Начальное приближение
+    initial_guess = np.sqrt(np.abs(R[0])) * np.random.rand(order + 1)
+
+    try:
+        solution = fsolve(equations, initial_guess, xtol=1e-6, maxfev=1000)
+        # Проверка на вещественность решения
+        if np.all(np.isreal(solution)):
+            return solution
+        return None
+    except:
+        return None
 
 
-def theoretical_ma_ncf(coefficients: np.array, max_lag: int) -> np.array:
-    """
-    Расчет теоретической НКФ для модели СС(N)
-    """
-    order = len(coefficients)
+def theoretical_ma_ncf(alpha, max_lag):
+    """Вычисляет теоретическую НКФ для модели СС"""
     r = np.zeros(max_lag + 1)
-    r[0] = 1.0  # Нормировка
+    q = len(alpha) - 1  # Порядок модели
 
-    if order == 0:  # СС(0) - белый шум
-        return r
+    # Расчет корреляционной функции
+    for k in range(max_lag + 1):
+        if k > q: break
+        r[k] = np.sum(alpha[:q + 1 - k] * alpha[k:])
 
-    # Вычисляем автокорреляции для лагов 1..order
-    denom = 1 + np.sum(coefficients ** 2)
-    for k in range(1, order + 1):
-        if k <= order:
-            r[k] = coefficients[k - 1] / denom
-            if k < order:
-                r[k] += np.sum([coefficients[i] * coefficients[i + k] for i in range(order - k)]) / denom
-        else:
-            r[k] = 0.0
-
+    # Нормировка
+    r = r / r[0]
     return r[:max_lag + 1]
 
 
-def plot_ma_models(process: np.array, max_order: int = 3, max_lag: int = 10):
-    """
-    Строит график сравнения выборочной НКФ с теоретическими НКФ моделей СС
-    """
-    _, empirical_ncf = calculate_sample_correlation(process, max_lag)
-    lags = np.arange(0, max_lag + 1)
-
-    plt.figure(figsize=(12, 6))
-    plt.plot(lags, empirical_ncf, 'ko-', label='Выборочная НКФ')
-
-    for order in range(max_order + 1):
-        coeffs, noise_var = fit_ma_model(process, order)
-        theoretical_ncf = theoretical_ma_ncf(coeffs, max_lag)
-        error = np.mean((empirical_ncf - theoretical_ncf) ** 2)
-        plt.plot(lags, theoretical_ncf, '--', label=f'СС({order}), ошибка={error:.4f}')
-
-    plt.xlabel('Лаг')
-    plt.ylabel('НКФ')
-    plt.title('Сравнение выборочной и теоретических НКФ для моделей СС')
-    plt.legend()
-    plt.grid(True)
-    plt.show()
-
-
-def print_ma_models_table(process: np.array, max_order: int = 3):
-    """
-    Выводит таблицу моделей скользящего среднего в формате методички
-    """
-    # Создаем DataFrame с нужными колонками
-    df = pd.DataFrame(columns=[
-        'Порядок модели',
-        'Параметры модели',
-        'Погрешность модели'
-    ])
-
-    _, empirical_ncf = calculate_sample_correlation(process, 10)
-    best_error = np.inf
-    best_order = None
-
-    for order in range(max_order + 1):
-        try:
-            # Пытаемся построить модель
-            coeffs, noise_var = fit_ma_model(process, order)
-
-            # Проверяем обратимость
-            if not check_invertibility(coeffs):
-                raise ValueError("Модель необратима")
-
-            # Рассчитываем теоретическую НКФ и ошибку
-            theoretical_ncf = theoretical_ma_ncf(coeffs, 10)
-            error = np.mean((empirical_ncf - theoretical_ncf) ** 2)
-
-            # Форматируем параметры
-            params = ' '.join([f"{c:.4f}" for c in coeffs]) if len(coeffs) > 0 else "–"
-
-            # Добавляем строку в таблицу
-            df.loc[order] = [
-                f"СС({order})",
-                params,
-                f"{error:.5f}"
-            ]
-
-            # Обновляем лучшую модель
-            if error < best_error:
-                best_error = error
-                best_order = order
-
-        except Exception as e:
-            # Для несуществующих моделей
-            df.loc[order] = [
-                f"СС({order})",
-                "Модель не существует",
-                "–"
-            ]
-
-    # Вывод таблицы
-    print("\nТаблица моделей скользящего среднего:")
-    print(tabulate(
-        df,
-        headers='keys',
-        tablefmt='grid',
-        showindex=False,
-        stralign="center",
-        numalign="center"
-    ))
-
-    if best_order is not None:
-        print(f"\nРекомендуемая модель: СС({best_order}) с погрешностью {best_error:.5f}")
-    else:
-        print("\nНевозможно построить работоспособную модель СС")
+def calculate_model_error(empirical_ncf, theoretical_ncf):
+    """Вычисляет среднеквадратичную ошибку"""
+    return np.mean((empirical_ncf - theoretical_ncf) ** 2)
 
 
 def control_point_3():
-    """Пункт 3.3: Анализ моделей скользящего среднего"""
+    """Пункт 3.3: Построение моделей скользящего среднего"""
     process = read_file()
-    print("\nАнализ моделей скользящего среднего:")
+    max_lag = 10
+    R, empirical_ncf = calculate_sample_correlation(process, max_lag)
 
-    # Сначала график
-    plot_ma_models(process)
+    # Таблица для результатов
+    results = {
+        'N': [],
+        'alpha0': [],
+        'alpha1': [],
+        'alpha2': [],
+        'alpha3': [],
+        'error': []
+    }
 
-    # Затем таблица
-    print_ma_models_table(process)
+    for n in range(4):
+        # Решаем систему уравнений
+        solution = solve_ma_system(R, n)
 
+        if solution is None or np.any(np.iscomplex(solution)):
+            # Модель не существует
+            results['N'].append(n)
+            results['alpha0'].append('Не существует')
+            for i in range(1, 4): results[f'alpha{i}'].append('-')
+            results['error'].append('-')
+            continue
 
-def fit_arma_model(process: np.array, ar_order: int, ma_order: int) -> tuple:
-    """
-    Подгонка модели ARMA(ar_order, ma_order)
-    Возвращает (ar_coeffs, ma_coeffs, intercept, error)
-    """
-    try:
-        model = ARIMA(process, order=(ar_order, 0, ma_order))
-        results = model.fit()
+        # Расчет теоретической НКФ
+        theoretical_ncf = theoretical_ma_ncf(solution, max_lag)
+        error = calculate_model_error(empirical_ncf, theoretical_ncf)
 
-        ar_coeffs = results.arparams if ar_order > 0 else np.array([])
-        ma_coeffs = results.maparams if ma_order > 0 else np.array([])
-        intercept = results.params[-1]  # Константа
+        # Заполнение таблицы
+        results['N'].append(n)
+        for i in range(4):
+            key = f'alpha{i}'
+            if i <= n:
+                results[key].append(f"{solution[i]:.4f}")
+            else:
+                results[key].append('-')
+        results['error'].append(f"{error:.4f}")
 
-        # Расчет ошибки через сравнение НКФ
-        theoretical_ncf = theoretical_arma_ncf(ar_coeffs, ma_coeffs, 10)
-        _, empirical_ncf = calculate_sample_correlation(process, 10)
-        error = np.mean((empirical_ncf - theoretical_ncf) ** 2)
-
-        return ar_coeffs, ma_coeffs, intercept, error
-
-    except:
-        # В случае ошибки подгонки модели
-        return np.nan, np.nan, np.nan, np.inf
-
-
-def theoretical_arma_ncf(ar_coeffs: np.array, ma_coeffs: np.array, max_lag: int) -> np.array:
-    """
-    Расчет теоретической НКФ для модели ARMA
-    """
-    # Для простоты используем встроенную функцию из statsmodels
-
-    ar = np.r_[1, -ar_coeffs] if len(ar_coeffs) > 0 else np.array([1])
-    ma = np.r_[1, ma_coeffs] if len(ma_coeffs) > 0 else np.array([1])
-
-    acovf = arma_acovf(ar, ma, nobs=max_lag + 1)
-    acf = acovf / acovf[0]  # Нормировка
-
-    return acf[:max_lag + 1]
-
-
-def print_arma_models_table(process: np.array, max_order: int = 3):
-    """
-    Выводит таблицу с результатами для моделей ARMA
-    """
-    columns = ['AR1', 'AR2', 'AR3', 'MA1', 'MA2', 'MA3', 'Const', 'error']
-    index = pd.MultiIndex.from_product(
-        [range(1, max_order + 1), range(1, max_order + 1)],
-        names=['M', 'N']
-    )
-    df = pd.DataFrame(index=index, columns=columns)
-
-    best_error = np.inf
-    best_model = (0, 0)
-
-    for m in range(1, max_order + 1):
-        for n in range(1, max_order + 1):
-            ar, ma, const, error = fit_arma_model(process, m, n)
-
-            # Заполняем строку таблицы
-            row = []
-            for i in range(1, 4):
-                row.append(f"{ar[i - 1]:.6f}" if i <= m and not np.isnan(ar).any() else "NaN")
-            for i in range(1, 4):
-                row.append(f"{ma[i - 1]:.6f}" if i <= n and not np.isnan(ma).any() else "NaN")
-            row.append(f"{const:.6f}" if not np.isnan(const) else "NaN")
-            row.append(error)
-
-            df.loc[(m, n)] = row
-
-            if error < best_error:
-                best_error = error
-                best_model = (m, n)
-
-    print("\nТаблица моделей ARMA(M,N):")
-    print(tabulate(df.reset_index(), headers='keys', tablefmt='grid', floatfmt=".6f"))
-    print(f"\nЛучшая модель: ARMA({best_model[0]},{best_model[1]}) с ошибкой {best_error:.6f}")
-
-    return best_model
-
-
-def check_stability(ar_coeffs: np.array):
-    """
-    Проверка устойчивости AR части модели
-    """
-    if len(ar_coeffs) == 0:
-        return True
-
-    # Характеристический полином: 1 - ar1*z - ar2*z^2 - ... = 0
-    poly = np.r_[1, -ar_coeffs]
-    roots = np.roots(poly)
-
-    # Все корни должны быть по модулю > 1
-    return all(np.abs(roots) > 1)
-
-
-def check_invertibility(ma_coeffs: np.array):
-    """
-    Проверка обратимости MA части модели
-    """
-    if len(ma_coeffs) == 0:
-        return True
-
-    # Характеристический полином: 1 + ma1*z + ma2*z^2 + ... = 0
-    poly = np.r_[1, ma_coeffs]
-    roots = np.roots(poly)
-
-    # Все корни должны быть по модулю > 1
-    return all(np.abs(roots) > 1)
-
-
-def plot_best_nkf(process, ar_coeffs, ma_coeffs, best_m, best_n):
-    """
-    Визуализация сравнения НКФ для лучшей модели
-    """
-    _, empirical_ncf = calculate_sample_correlation(process, 10)
-    theoretical_ncf = theoretical_arma_ncf(ar_coeffs, ma_coeffs, 10)
-    lags = np.arange(0, 11)
-
-    plt.figure(figsize=(12, 6))
-    plt.plot(lags, empirical_ncf, 'ko-', label='Выборочная НКФ')
-    plt.plot(lags, theoretical_ncf, 'r--', label=f'ARMA({best_m},{best_n}) Теоретическая НКФ')
-    plt.xlabel('Лаг')
-    plt.ylabel('НКФ')
-    plt.title(f'Сравнение НКФ для лучшей модели ARMA({best_m},{best_n})')
-    plt.legend()
-    plt.grid(True)
-    plt.show()
-
-
-def control_point_4():
-    """Пункт 3.4: Анализ смешанных ARMA моделей"""
-    process = read_file()
-    print("\nАнализ смешанных ARMA моделей:")
-
-    # Построение и сравнение моделей
-    best_m, best_n = print_arma_models_table(process)
-
-    # Проверка устойчивости лучшей модели
-    ar_coeffs, ma_coeffs, _, _ = fit_arma_model(process, best_m, best_n)
-
-    print("\nПроверка устойчивости лучшей модели:")
-    print(f"AR часть (M={best_m}): {'Устойчива' if check_stability(ar_coeffs) else 'Неустойчива'}")
-    print(f"MA часть (N={best_n}): {'Обратима' if check_invertibility(ma_coeffs) else 'Необратима'}")
-
-    plot_best_nkf(process, ar_coeffs, ma_coeffs, best_m, best_n)
+    # Вывод таблицы
+    df = pd.DataFrame(results)
+    print("\nТаблица 3 – Модели скользящего среднего СС(N)")
+    print(tabulate(df, headers='keys', tablefmt='grid', showindex=False))
 
 
 if __name__ == '__main__':
     # control_point_1()
-    control_point_2()
-    # control_point_3()
-    # control_point_4()
+    #control_point_2()
+     control_point_3()
