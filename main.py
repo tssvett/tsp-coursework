@@ -9,7 +9,7 @@ from tabulate import tabulate  # Для красивого вывода табл
 warnings.filterwarnings('ignore')  # Игнорируем предупреждения
 
 
-def read_file(filepath: str = '10.txt') -> np.array:
+def read_file(filepath: str = '79.txt') -> np.array:
     """Чтение данных из файла"""
     with open(filepath, 'r', encoding='utf-8') as file:
         file.readline()  # Пропускаем заголовок
@@ -436,15 +436,309 @@ def control_point_3():
         print(f"\nРекомендуемая модель: СС({best_order}) с погрешностью ε² = {best_eps:.6f}")
     else:
         print("\nНе удалось построить работоспособную модель СС")
+from scipy.optimize import fsolve
+import numpy as np
+
+# --- Функция для подсчёта ошибки ---
+def eps(theor, emp):
+    # Сумма квадратов разностей по первым 11 лагам (k=0..10)
+    return np.sum((theor[:11] - emp[:11]) ** 2)
+
+# --- Функции для смешанных моделей АРСС(M,N) ---
+
+def apcc11f(p):
+    b1, a0, a1 = p
+    return korr[2] / korr[1] - b1, b1 * korr[1] + a0 ** 2 + a1 ** 2 + a1 * b1 * a0 - korr[0], b1 * korr[0] + a1 * a0 - korr[1]
+
+def apcc11(korr):
+    print("АРСС(1,1)")
+    b1, a0, a1 = fsolve(apcc11f, (0, np.sqrt(korr[0]), 0))
+    p = b1, a0, a1
+    if np.linalg.norm(apcc11f(p), 1) > 0.0001:
+        print("None")
+    else:
+        print(p)
+        print(np.linalg.norm(apcc11f(p), 1))
+        if abs(b1) < 1:
+            print("Устойчива")
+            ap11 = np.zeros(11)
+            ap11[0] = korr[0] / d
+            ap11[1] = korr[1] / d
+            ap11[2] = korr[2] / d
+            for i in range(3, 11):
+                ap11[i] = b1 * ap11[i - 1]
+            eps11 = eps(ap11, normcorr)
+            print("eps=", eps11)
+        else:
+            print("Не устойчива")
+
+def apcc12f(p):
+    b1, a0, a1, a2 = p
+    return korr[3] / korr[2] - b1, b1 * korr[1] + a0 ** 2 + a1 ** 2 + a1 * b1 * a0 + a2 * b1 * b1 * a0 + a2 * b1 * a1 + a2 ** 2 - korr[0], b1 * korr[0] + a1 * a0 + a0 * a2 * b1 + a1 * a2 - korr[1], b1 * korr[1] + a2 * a0 - korr[2]
+
+def apcc12(korr):
+    print("АРСС(1,2)")
+    b1, a0, a1, a2 = fsolve(apcc12f, (0, np.sqrt(korr[0]), 0, 0))
+    p = b1, a0, a1, a2
+    if np.linalg.norm(apcc12f(p), 1) > 0.0001:
+        print("None")
+    else:
+        print(p)
+        print(np.linalg.norm(apcc12f(p), 1))
+        if abs(b1) < 1:
+            print("Устойчива")
+            ap12 = np.zeros(11)
+            ap12[0] = korr[0] / d
+            ap12[1] = korr[1] / d
+            ap12[2] = korr[2] / d
+            ap12[3] = korr[3] / d
+            for i in range(4, 11):
+                ap12[i] = b1 * ap12[i - 1]
+            eps12 = eps(ap12, normcorr)
+            print("eps=", eps12)
+        else:
+            print("Не устойчива")
+
+def apcc13f(p):
+    b1, a0, a1, a2, a3 = p
+    return korr[4] / korr[3] - b1, -korr[0] + b1 * korr[1] + a0 ** 2 + a1 * b1 * a0 + a1 ** 2 + a2 * b1 * b1 * a0 + a2 * b1 * a1 + a2 ** 2 + a3 * (b1 ** 3) * a0 + a3 * b1 * b1 * a1 + a3 * b1 * a2 + a3 ** 2, -korr[1] + b1 * korr[0] + a1 * a0 + a2 * b1 * a0 + a2 * a1 + a3 * b1 * b1 * a0 + a3 * b1 * a1 + a3 * a2, -korr[2] + b1 * korr[1] + a2 * a0 + a3 * b1 * a0 + a3 * a1, -korr[3] + b1 * korr[2] + a3 * a0
+
+def apcc13(korr):
+    print("АРСС(1,3)")
+    b1, a0, a1, a2, a3 = fsolve(apcc13f, (0, np.sqrt(korr[0]), 0, 0, 0))
+    p = b1, a0, a1, a2, a3
+    if np.linalg.norm(apcc13f(p), 1) > 0.0001:
+        print("None")
+    else:
+        print(p)
+        print(np.linalg.norm(apcc13f(p), 1))
+        if abs(b1) < 1:
+            print("Устойчива")
+            ap13 = np.zeros(11)
+            ap13[0] = korr[0] / d
+            ap13[1] = korr[1] / d
+            ap13[2] = korr[2] / d
+            ap13[3] = korr[3] / d
+            ap13[4] = korr[4] / d
+            for i in range(5, 11):
+                ap13[i] = b1 * ap13[i - 1]
+            eps13 = eps(ap13, normcorr)
+            print("eps=", eps13)
+        else:
+            print("Не устойчива")
+
+def apcc21f(p):
+    b1, b2, a0, a1 = p
+    return b1 * korr[1] + b2 * korr[0] - korr[2], b1 * korr[2] + b2 * korr[1] - korr[3], -korr[0] + b1 * korr[1] + b2 * korr[2] + a0 ** 2 + a1 * b1 * a0 + a1 ** 2, -korr[1] + b1 * korr[0] + b2 * korr[1] + a1 * a0
+
+def apcc21(korr):
+    print("АРСС(2,1)")
+    b1, b2, a0, a1 = fsolve(apcc21f, (0, 0, np.sqrt(korr[0]), 0))
+    p = b1, b2, a0, a1
+    if np.linalg.norm(apcc21f(p), 1) > 0.0001:
+        print("None")
+    else:
+        print(p)
+        print(np.linalg.norm(apcc21f(p), 1))
+        if abs(b2) < 1 and abs(b1) < 1 - b2:
+            print("Устойчива")
+            ap21 = np.zeros(11)
+            ap21[0] = korr[0] / d
+            ap21[1] = korr[1] / d
+            ap21[2] = korr[2] / d
+            ap21[3] = korr[3] / d
+            for i in range(4, 11):
+                ap21[i] = b1 * ap21[i - 1] + b2 * ap21[i - 2]
+            eps21 = eps(ap21, normcorr)
+            print("eps=", eps21)
+        else:
+            print("Не устойчива")
+
+def apcc22f(p):
+    b1, b2, a0, a1, a2 = p
+    return b1 * korr[2] + b2 * korr[1] - korr[3], b1 * korr[3] + b2 * korr[2] - korr[4], -korr[0] + b1 * korr[1] + b2 * korr[2] + a0 ** 2 + a1 * b1 * a0 + a1 ** 2 + a2 * (b1 * (b1 * a0 + a1) + b2 * a0 + a2), -korr[1] + b1 * korr[0] + b2 * korr[1] + a1 * a0 + a2 * (b1 * a0 + a1), -korr[2] + b1 * korr[1] + b2 * korr[0] + a2 * a0
+
+def apcc22(korr):
+    print("АРСС(2,2)")
+    b1, b2, a0, a1, a2 = fsolve(apcc22f, (0, 0, np.sqrt(korr[0]), 0, 0))
+    p = b1, b2, a0, a1, a2
+    if np.linalg.norm(apcc22f(p), 1) > 0.0001:
+        print("None")
+    else:
+        print(p)
+        print(np.linalg.norm(apcc22f(p), 1))
+        if abs(b2) < 1 and abs(b1) < 1 - b2:
+            print("Устойчива")
+            ap22 = np.zeros(11)
+            ap22[0] = korr[0] / d
+            ap22[1] = korr[1] / d
+            ap22[2] = korr[2] / d
+            ap22[3] = korr[3] / d
+            ap22[4] = korr[4] / d
+            for i in range(5, 11):
+                ap22[i] = b1 * ap22[i - 1] + b2 * ap22[i - 2]
+            eps22 = eps(ap22, normcorr)
+            print("eps=", eps22)
+        else:
+            print("Не устойчива")
+
+def apcc23f(p):
+    b1, b2, a0, a1, a2, a3 = p
+    return b1 * korr[3] + b2 * korr[2] - korr[4], b1 * korr[4] + b2 * korr[3] - korr[5], -korr[0] + b1 * korr[1] + b2 * korr[2] + a0 ** 2 + a1 * b1 * a0 + a1 ** 2 + a2 * (b1 * (b1 * a0 + a1) + b2 * a0 + a2) + a3 * (b1 * (b1 * (b1 * a0 + a1) + b2 * a0 + a2) + b2 * (b1 * a0 + a1) + a3), -korr[1] + b1 * korr[0] + b2 * korr[1] + a1 * a0 + a2 * (b1 * a0 + a1) + a3 * (b1 * (b1 * a0 + a1) + b2 * a0 + a2), -korr[2] + b1 * korr[1] + b2 * korr[0] + a2 * a0 + a3 * (b1 * a0 + a1), -korr[3] + b1 * korr[2] + b2 * korr[1] + a3 * a0
+
+def apcc23(korr):
+    print("АРСС(2,3)")
+    b1, b2, a0, a1, a2, a3 = fsolve(apcc23f, (0, 0, np.sqrt(korr[0]), 0, 0, 0))
+    p = b1, b2, a0, a1, a2, a3
+    if np.linalg.norm(apcc23f(p), 1) > 0.0001:
+        print("None")
+    else:
+        print(p)
+        print(np.linalg.norm(apcc23f(p), 1))
+        if abs(b2) < 1 and abs(b1) < 1 - b2:
+            print("Устойчива")
+            ap23 = np.zeros(11)
+            ap23[0] = korr[0] / d
+            ap23[1] = korr[1] / d
+            ap23[2] = korr[2] / d
+            ap23[3] = korr[3] / d
+            ap23[4] = korr[4] / d
+            ap23[5] = korr[5] / d
+            for i in range(6, 11):
+                ap23[i] = b1 * ap23[i - 1] + b2 * ap23[i - 2]
+            eps23 = eps(ap23, normcorr)
+            print("eps=", eps23)
+        else:
+            print("Не устойчива")
+
+def apcc31f(p):
+    b1, b2, b3, a0, a1 = p
+    return -korr[2] + b1 * korr[1] + b2 * korr[0], -korr[3] + b1 * korr[2] + b2 * korr[1] + b3 * korr[0], -korr[4] + b1 * korr[3] + b2 * korr[2] + b3 * korr[1], -korr[0] + b1 * korr[1] + b2 * korr[2] + b3 * korr[3] + a0 ** 2 + a1 * (b1 * a0 + a1), -korr[1] + b1 * korr[0] + b2 * korr[1] + b3 * korr[2] + a1 * a0
+
+def apcc31(korr):
+    print("АРСС(3,1)")
+    b1, b2, b3, a0, a1 = fsolve(apcc31f, (0, 0, 0, np.sqrt(korr[0]), 0))
+    p = b1, b2, b3, a0, a1
+    if np.linalg.norm(apcc31f(p), 1) > 0.0001:
+        print("None")
+    else:
+        print(p)
+        print(np.linalg.norm(apcc31f(p), 1))
+        if abs(b3) < 1 and abs(b1 + b3) < 1 - b2 and abs(b2 - b1 * b3) < abs(1 - b3 ** 2):
+            print("Устойчива")
+            ap31 = np.zeros(11)
+            ap31[0] = korr[0] / d
+            ap31[1] = korr[1] / d
+            ap31[2] = korr[2] / d
+            ap31[3] = korr[3] / d
+            ap31[4] = korr[4] / d
+            for i in range(5, 11):
+                ap31[i] = b1 * ap31[i - 1] + b2 * ap31[i - 2] + b3 * ap31[i - 3]
+            eps31 = eps(ap31, normcorr)
+            print("eps=", eps31)
+        else:
+            print("Не устойчива")
+
+def apcc32f(p):
+    b1, b2, b3, a0, a1, a2 = p
+    return -korr[3] + b1 * korr[2] + b2 * korr[1] + b3 * korr[0], -korr[4] + b1 * korr[3] + b2 * korr[2] + b3 * korr[1], -korr[5] + b1 * korr[4] + b2 * korr[3] + b3 * korr[2], -korr[0] + b1 * korr[1] + b2 * korr[2] + b3 * korr[3] + a0 ** 2 + a1 * (b1 * a0 + a1) + a2 * (b1 * (b1 * a0 + a1) + b2 * a0 + a2), -korr[1] + b1 * korr[0] + b2 * korr[1] + b3 * korr[2] + a1 * a0 + a2 * (b1 * a0 + a1), -korr[2] + b1 * korr[1] + b2 * korr[0] + b3 * korr[1] + a2 * a0
+
+def apcc32(korr):
+    print("АРСС(3,2)")
+    b1, b2, b3, a0, a1, a2 = fsolve(apcc32f, (0, 0, 0, np.sqrt(korr[0]), 0, 0))
+    p = b1, b2, b3, a0, a1, a2
+    if np.linalg.norm(apcc32f(p), 1) > 0.0001:
+        print("None")
+    else:
+        print(p)
+        print(np.linalg.norm(apcc32f(p), 1))
+        if abs(b3) < 1 and abs(b1 + b3) < 1 - b2 and abs(b2 - b1 * b3) < abs(1 - b3 ** 2):
+            print("Устойчива")
+            ap32 = np.zeros(11)
+            ap32[0] = korr[0] / d
+            ap32[1] = korr[1] / d
+            ap32[2] = korr[2] / d
+            ap32[3] = korr[3] / d
+            ap32[4] = korr[4] / d
+            ap32[5] = korr[5] / d
+            for i in range(6, 11):
+                ap32[i] = b1 * ap32[i - 1] + b2 * ap32[i - 2] + b3 * ap32[i - 3]
+            eps32 = eps(ap32, normcorr)
+            print("eps=", eps32)
+        else:
+            print("Не устойчива")
+
+def apcc33f(p):
+    b1, b2, b3, a0, a1, a2, a3 = p
+    return -korr[4] + b1 * korr[3] + b2 * korr[2] + b3 * korr[1], -korr[5] + b1 * korr[4] + b2 * korr[3] + b3 * korr[2], -korr[6] + b1 * korr[5] + b2 * korr[4] + b3 * korr[3], -korr[0] + b1 * korr[1] + b2 * korr[2] + b3 * korr[3] + a0 ** 2 + a1 * (b1 * a0 + a1) + a2 * (b1 * (b1 * a0 + a1) + b2 * a0 + a2) + a3 * (b1 * (b1 * (b1 * a0 + a1) + b2 * a0 + a2) + b2 * (b1 * a0 + a1) + b3 * a0 + a3), -korr[1] + b1 * korr[0] + b2 * korr[1] + b3 * korr[2] + a1 * a0 + a2 * (b1 * a0 + a1) + a3 * (b1 * (b1 * a0 + a1) + b2 * a0 + a2), -korr[2] + b1 * korr[1] + b2 * korr[0] + b3 * korr[1] + a2 * a0 + a3 * (b1 * a0 + a1), -korr[3] + b1 * korr[2] + b2 * korr[1] + b3 * korr[0] + a3 * a0
+
+def apcc33(korr):
+    print("АРСС(3,3)")
+    b1, b2, b3, a0, a1, a2, a3 = fsolve(apcc33f, (0, 0, 0, np.sqrt(korr[0]), 0, 0, 0))
+    p = b1, b2, b3, a0, a1, a2, a3
+    if np.linalg.norm(apcc33f(p), 1) > 0.0001:
+        print("None")
+    else:
+        print(p)
+        print(np.linalg.norm(apcc33f(p), 1))
+        if abs(b3) < 1 and abs(b1 + b3) < 1 - b2 and abs(b2 - b1 * b3) < abs(1 - b3 ** 2):
+            print("Устойчива")
+            ap33 = np.zeros(11)
+            ap33[0] = korr[0] / d
+            ap33[1] = korr[1] / d
+            ap33[2] = korr[2] / d
+            ap33[3] = korr[3] / d
+            ap33[4] = korr[4] / d
+            ap33[5] = korr[5] / d
+            ap33[6] = korr[6] / d
+            for i in range(7, 11):
+                ap33[i] = b1 * ap33[i - 1] + b2 * ap33[i - 2] + b3 * ap33[i - 3]
+            eps33 = eps(ap33, normcorr)
+            print("eps=", eps33)
+        else:
+            print("Не устойчива")
+
+# --- Основная функция для вызова всех моделей ---
+
+def control_point_4():
+    print("\nПункт 4: Анализ смешанных моделей АРСС(M,N)")
+    process = read_file()
+    max_lag = 10
+    global korr, normcorr, d
+    korr, normcorr = calculate_correlations(process, max_lag)
+    d = korr[0]
+
+    apcc11(korr)
+    print()
+    apcc12(korr)
+    print()
+    apcc13(korr)
+    print()
+    apcc21(korr)
+    print()
+    apcc22(korr)
+    print()
+    apcc23(korr)
+    print()
+    apcc31(korr)
+    print()
+    apcc32(korr)
+    print()
+    apcc33(korr)
+    print()
 
 # --- Запуск ---
 
 if __name__ == '__main__':
     # Запуск первого контрольного пункта
-    control_point_1()
+    #control_point_1()
 
     # Запуск второго контрольного пункта (модели АР)
-    control_point_2()
+    #control_point_2()
 
-    # Третий пункт (модели СС) можно добавить аналогично
-    control_point_3()
+    # Третий пункт (модели СС)
+    #control_point_3()
+
+    # Четвертый пункт (Смешанные модели)
+
+    control_point_4()
