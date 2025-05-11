@@ -9,7 +9,7 @@ from tabulate import tabulate  # Для красивого вывода табл
 warnings.filterwarnings('ignore')  # Игнорируем предупреждения
 
 
-def read_file(filepath: str = '79.txt') -> np.array:
+def read_file(filepath: str = '10.txt') -> np.array:
     """Чтение данных из файла"""
     with open(filepath, 'r', encoding='utf-8') as file:
         file.readline()  # Пропускаем заголовок
@@ -727,18 +727,121 @@ def control_point_4():
     apcc33(korr)
     print()
 
+def model(mod):
+    mod1 = mod[1000:6000]
+    mo = np.mean(mod1)
+    ds = np.var(mod1, ddof=1)
+    korre = [np.mean((mod1[:len(mod1)-k] - mo) * (mod1[k:] - mo)) for k in range(11)]
+    normkore = korre / korre[0]
+    return mod1, mo, ds, korre, normkore
+
+def plot_ncf_compare(title, normcorr, normkorrt, normkorrm, filename):
+    x = np.arange(0, 11, 1)
+    plt.figure(figsize=(8,5))
+    plt.plot(x, normcorr[:11], 'ko-', label="Исходный процесс")
+    plt.plot(x, normkorrt[:11], 'bs--', label="Теоретическая НКФ")
+    plt.plot(x, normkorrm[:11], 'r^-.', label="Моделированный процесс")
+    plt.xlabel("Лаг k")
+    plt.ylabel("Нормированная КФ")
+    plt.title(title)
+    plt.legend()
+    plt.grid(True)
+    plt.tight_layout()
+    plt.savefig(filename)
+    plt.show()
+
+def control_point_5():
+
+    process = read_file()
+    max_lag = 10
+    korr, normcorr = calculate_correlations(process, max_lag)
+    m = np.mean(process)
+    d = korr[0]
+
+    print("Исходный процесс")
+    print("Среднее", m)
+    print("Дисперсия", d)
+    print("CKO", np.sqrt(d))
+    for i in range(11):
+        print("НКФ", i, normcorr[i])
+
+    # Генерируем белый шум
+    ksi = np.random.normal(0, 1, size=6000)
+
+    # ----- Модель АР(3) -----
+    # Замените на ваши параметры (примерные)
+    b1, b2, b3 = 0.4818, -0.3958, -0.2517
+    a0 = 16.1297
+    mdap3 = m * (1 - b1 - b2 - b3)
+    modap3 = np.zeros(6000)
+    modap3[0] = a0 * ksi[0] + mdap3
+    modap3[1] = b1 * modap3[0] + a0 * ksi[1] + mdap3
+    modap3[2] = b1 * modap3[1] + b2 * modap3[0] + a0 * ksi[2] + mdap3
+    for i in range(3, 6000):
+        modap3[i] = b1 * modap3[i-1] + b2 * modap3[i-2] + b3 * modap3[i-3] + a0 * ksi[i] + mdap3
+    modap3, map3, dap3, korrap3, normkorrap3 = model(modap3)
+    # Теоретическая НКФ (по рекуррентной формуле)
+    normkorrtap3 = np.zeros(11)
+    normkorrtap3[0] = 1
+    normkorrtap3[1] = b1
+    normkorrtap3[2] = b1*normkorrtap3[1] + b2
+    for i in range(3, 11):
+        normkorrtap3[i] = b1*normkorrtap3[i-1] + b2*normkorrtap3[i-2] + b3*normkorrtap3[i-3]
+    plot_ncf_compare("Сравнение НКФ для АР(3)", normcorr, normkorrtap3, normkorrap3, "ar3_ncf.png")
+
+    # ----- Модель СС(1) -----
+    a0, a1, a2 = 19.5061, 9.7507, 0.0
+    modcc1 = np.zeros(6000)
+    modcc1[0] = a0 * ksi[0] + m
+    modcc1[1] = a0 * ksi[1] + a1 * ksi[0] + m
+    for i in range(2, 6000):
+        modcc1[i] = a0 * ksi[i] + a1 * ksi[i-1] + a2 * ksi[i-2] + m
+    modcc1, mcc1, dcc1, korrcc1, normkorrcc1 = model(modcc1)
+    # Теоретическая НКФ для СС(1)
+    normkorrtcc1 = np.zeros(11)
+    normkorrtcc1[0] = (a0**2 + a1**2) / (a0**2 + a1**2)
+    normkorrtcc1[1] = (a0*a1) / (a0**2 + a1**2)
+    for i in range(2, 11):
+        normkorrtcc1[i] = 0
+    plot_ncf_compare("Сравнение НКФ для СС(1)", normcorr, normkorrtcc1, normkorrcc1, "cc1_ncf.png")
+
+    # ----- Модель АРСС(2,3) -----
+    b1, b2, b3 = 0.9675, -0.7111, 0.0
+    a0, a1, a2, a3 = 15.9646, -8.4029, 0.3202, 0.6552
+    md23 = m * (1 - b1 - b2 - b3)
+    mod23 = np.zeros(6000)
+    mod23[0] = a0 * ksi[0] + md23
+    mod23[1] = b1 * mod23[0] + a0 * ksi[1] + a1 * ksi[0] + md23
+    mod23[2] = b1 * mod23[1] + b2 * mod23[0] + a0 * ksi[2] + a1 * ksi[1] + a2 * ksi[0] + md23
+    mod23[3] = b1 * mod23[2] + b2 * mod23[1] + b3 * mod23[0] + a0 * ksi[3] + a1 * ksi[2] + a2 * ksi[1] + a3 * ksi[0] + md23
+    for i in range(4, 6000):
+        mod23[i] = b1 * mod23[i-1] + b2 * mod23[i-2] + b3 * mod23[i-3] + a0 * ksi[i] + a1 * ksi[i-1] + a2 * ksi[i-2] + a3 * ksi[i-3] + md23
+    mod23, m23, d23, korr23, normkorr23 = model(mod23)
+    # Теоретическая НКФ для АРСС(2,3) (рекуррентно)
+    normkorrt23 = np.zeros(11)
+    normkorrt23[0] = 1
+    normkorrt23[1] = b1
+    normkorrt23[2] = b1*normkorrt23[1] + b2
+    for i in range(3, 11):
+        normkorrt23[i] = b1*normkorrt23[i-1] + b2*normkorrt23[i-2] + b3*normkorrt23[i-3]
+    plot_ncf_compare("Сравнение НКФ для АРСС(2,3)", normcorr, normkorrt23, normkorr23, "arcc23_ncf.png")
+
+    # Выводим параметры и ошибки для отчёта
+    print("\nАР(3):")
+    print("Среднее", map3, "Дисперсия", dap3)
+    print("Погрешность (теор/мод):", eps(normkorrtap3, normcorr), eps(normkorrap3, normcorr))
+    print("СС(1):")
+    print("Среднее", mcc1, "Дисперсия", dcc1)
+    print("Погрешность (теор/мод):", eps(normkorrtcc1, normcorr), eps(normkorrcc1, normcorr))
+    print("АРСС(2,3):")
+    print("Среднее", m23, "Дисперсия", d23)
+    print("Погрешность (теор/мод):", eps(normkorrt23, normcorr), eps(normkorr23, normcorr))
+
 # --- Запуск ---
 
 if __name__ == '__main__':
-    # Запуск первого контрольного пункта
     #control_point_1()
-
-    # Запуск второго контрольного пункта (модели АР)
     #control_point_2()
-
-    # Третий пункт (модели СС)
     #control_point_3()
-
-    # Четвертый пункт (Смешанные модели)
-
-    control_point_4()
+    #control_point_4()
+    control_point_5()
