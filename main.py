@@ -1,16 +1,12 @@
 import warnings
 
-import pandas as pd
-import statsmodels.api as sm
-from statsmodels.tsa.ar_model import AutoReg
-from statsmodels.tsa.arima.model import ARIMA
-from statsmodels.tsa.arima_process import arma_acovf
+import matplotlib.pyplot as plt
+from scipy.optimize import fsolve
+import numpy as np
+import math
 from tabulate import tabulate  # Для красивого вывода таблицы
 
 warnings.filterwarnings('ignore')  # Игнорируем предупреждения
-
-import numpy as np
-import matplotlib.pyplot as plt
 
 
 def read_file(filepath: str = '10.txt') -> np.array:
@@ -21,22 +17,31 @@ def read_file(filepath: str = '10.txt') -> np.array:
     return np.array(data)
 
 
-def calculate_statistics(data: np.array) -> tuple:
-    """Вычисление выборочного среднего, исправленной дисперсии и стандартного отклонения"""
-    mean_val = np.mean(data)
-    variance = np.var(data, ddof=1)  # Несмещённая оценка
-    std_dev = np.std(data, ddof=1)
-    return mean_val, variance, std_dev
+def calculate_mean(process: list) -> float:
+    sum: float = 0.
+    for i in range(0, len(process)):
+        sum += process[i]
+    sum /= len(process)
+    return sum
 
 
-def calculate_sample_correlation(data: np.array, max_lag: int) -> tuple:
+def calculate_variance(process: list) -> float:
+    mean = calculate_mean(process)
+    sum: float = 0.
+    for i in range(0, len(process)):
+        sum += (process[i] - mean) * (process[i] - mean)
+    sum /= (len(process) - 1)
+    return sum
+
+
+def calculate_correlations(data: np.array, max_lag: int) -> tuple:
     """
     Вычисление выборочной корреляционной функции (КФ) и нормированной КФ (НКФ)
     с использованием исправленной формулы.
     """
     n = len(data)
-    mean_val = np.mean(data)
-    variance = np.var(data, ddof=1)
+    mean_val = calculate_mean(data)
+    variance = calculate_variance(data)
     R = []
     for k in range(max_lag + 1):
         numerator = sum((data[j] - mean_val) * (data[j + k] - mean_val) for j in range(n - k))
@@ -85,12 +90,30 @@ def plot_process_fragment(process: np.array, points_to_plot: int = 150):
 
 
 def plot_normalized_correlation(lags: np.array, ncf: np.array, corr_interval: int):
-    """Построение графика нормированной корреляционной функции с порогом и интервалом корреляции"""
+    """Построение графика нормированной корреляционной функции с линиями между точками"""
     plt.figure(figsize=(10, 6))
-    plt.stem(lags, ncf, basefmt=" ", use_line_collection=True)
+
+    # Рисуем линии между точками
+    plt.plot(lags, ncf, 'k-', linewidth=1, label='Линия между точками')
+
+    # Рисуем точки и вертикальные линии (stem)
+    markerline, stemlines, baseline = plt.stem(
+        lags,
+        ncf,
+        linefmt='k--',
+        markerfmt='ko',
+        basefmt=" "
+    )
+
+    # Настраиваем толщину линий и размер маркеров
+    plt.setp(stemlines, linewidth=1)
+    plt.setp(markerline, markersize=5)
+
+    # Горизонтальные и вертикальные линии порогов
     plt.axhline(0, color='black', linewidth=0.8)
     plt.axhline(1 / np.e, color='red', linestyle='--', label='Порог 1/e')
-    plt.axvline(corr_interval, color='green', linestyle='--', label=f'Интервал корреляции = {corr_interval}')
+    plt.axvline(corr_interval, color='green', linestyle='--', label=f'Интервал = {corr_interval}')
+
     plt.xlabel('Сдвиг (лаг), k')
     plt.ylabel('Нормированная корреляционная функция')
     plt.title('Нормированная корреляционная функция процесса')
@@ -98,36 +121,6 @@ def plot_normalized_correlation(lags: np.array, ncf: np.array, corr_interval: in
     plt.grid(True, linestyle=':', alpha=0.5)
     plt.tight_layout()
     plt.show()
-
-
-def control_point_1():
-    max_lag = 10
-    # Чтение данных
-    process = read_file()
-
-    # Вычисление статистик
-    mean_val, variance, std_dev = calculate_statistics(process)
-    print(f"Выборочное среднее: {mean_val:.4f}")
-    print(f"Выборочная дисперсия (исправленная): {variance:.4f}")
-    print(f"Стандартное отклонение: {std_dev:.4f}")
-
-    # Визуализация процесса
-    plot_process_fragment(process)
-
-    # Вычисление корреляционных функций
-    R, ncf = calculate_sample_correlation(process, max_lag)
-    corr_interval = estimate_correlation_interval(ncf)
-
-    # Вывод таблицы с КФ и НКФ
-    print_correlation_table(R, ncf)
-
-    # Визуализация нормированной корреляционной функции
-    lags = np.arange(max_lag + 1)
-    plot_normalized_correlation(lags, ncf, corr_interval)
-
-    print(f"\nИнтервал корреляции: {corr_interval} отсчёта")
-
-    return process
 
 
 def plot_process_fragment(process):
@@ -151,222 +144,307 @@ def plot_process_fragment(process):
     plt.show()
 
 
-def plot_normalized_correlation(lags: np.array, ncf: np.array, corr_interval: int = None):
-    """Визуализация нормированной корреляционной функции"""
-    plt.figure(figsize=(12, 6))
-    plt.plot(lags, ncf, 'b-', label='НКФ')
-    plt.axhline(1 / np.e, color='r', linestyle='--', label='1/e')
-    if corr_interval is not None:
-        plt.axvline(corr_interval, color='g', linestyle=':', label=f'Интервал корреляции = {corr_interval}')
-        plt.scatter(corr_interval, ncf[corr_interval], color='red', s=100, zorder=5)
-    plt.xlabel('Лаг')
-    plt.ylabel('Корреляция')
-    plt.title('Нормированная корреляционная функция')
-    plt.grid(True, linestyle='--', alpha=0.5)
-    plt.legend()
-    plt.show()
+def control_point_1():
+    max_lag = 10
+    # Чтение данных
+    process = read_file()
+
+    # Вычисление статистик
+    mean_val = calculate_mean(process)
+    variance = calculate_variance(process)
+    _, normilized_correlation = calculate_correlations(process, max_lag)
+    print(f"Выборочное среднее: {mean_val:.4f}")
+    print(f"Выборочная дисперсия: {variance:.4f}")
+    print(f"fНормированная корреляционная функция: {normilized_correlation}")
+
+    # Визуализация процесса
+    plot_process_fragment(process)
+
+    # Вычисление корреляционных функций
+    R, ncf = calculate_correlations(process, max_lag)
+    corr_interval = estimate_correlation_interval(ncf)
+
+    # Вывод таблицы с КФ и НКФ
+    print_correlation_table(R, ncf)
+
+    # Визуализация нормированной корреляционной функции
+    lags = np.arange(max_lag + 1)
+    plot_normalized_correlation(lags, ncf, corr_interval)
+
+    print(f"\nИнтервал корреляции: {corr_interval} отсчёта")
+
+    return process
 
 
-def fit_ar_model(data: np.array, order: int) -> tuple:
+# --- Функции для задания 2 (модели АР) ---
+
+def findBetasAR(R: list, m: int, a_list: list = None, b_list: list = None, matr_a=None, vec_b=None):
     """
-    Построение модели авторегрессии АР(M)
-    Возвращает коэффициенты модели и дисперсию шума
+    Рекурсивное решение систем уравнений для поиска коэффициентов α и β моделей АР(M).
+    Возвращает списки a_list (α0 для каждого M) и b_list (списки β для каждого M).
     """
-    model = AutoReg(data, lags=order, old_names=False)
-    results = model.fit()
-    coefficients = results.params  # [const, ar.L1, ar.L2, ...]
-    noise_variance = results.sigma2
-    return coefficients, noise_variance
+    if a_list is None:
+        a_list = []
+    if b_list is None:
+        b_list = []
+
+    if m == 0:
+        a_list.reverse()
+        b_list.reverse()
+        return a_list, b_list
+
+    if m == 4:
+        matr_a = np.array([[1, R[1], R[2], R[3]],
+                           [0, R[0], R[1], R[2]],
+                           [0, R[1], R[0], R[1]],
+                           [0, R[2], R[1], R[0]]])
+        vec_b = np.array([[R[0]], [R[1]], [R[2]], [R[3]]])
+
+    # Решаем систему Ax = b
+    res = np.linalg.solve(matr_a, vec_b).ravel()
+
+    a0 = math.sqrt(res[0])
+    a_list.append(a0)
+    print(f"M = {m - 1} a = {math.sqrt(res[0]):.4f}")
+
+    # β параметры
+    b_temp = []
+    for i in range(1, m):
+        b_temp.append(res[i])
+        print(f"Для M = {m - 1} параметр β_{i} = {res[i]:.4f}")
+    b_list.append(b_temp)
+    print()
+
+    # Рекурсивный вызов для следующего порядка
+    return findBetasAR(R, m - 1, a_list, b_list, matr_a[:m - 1, :m - 1], vec_b[:m - 1])
 
 
-def theoretical_ar_ncf(coefficients: np.array, max_lag: int) -> np.array:
+def theoretical_normalCorrelationAR(b_list, normalCorrelation_list, max_lag):
     """
-    Расчет теоретической НКФ для модели АР(M)
+    Вычисление теоретической НКФ для моделей АР(M) по найденным коэффициентам β.
+    Возвращает список списков с теоретическими НКФ для каждого порядка M.
     """
-    ar_coeffs = coefficients[1:]  # Игнорируем константу
-    order = len(ar_coeffs)
+    theoretical_list = []
+    for M in range(4):
+        buf_list = []
+        for k in range(max_lag + 1):
+            if k <= M:
+                # Для лагов <= M теоретическая НКФ совпадает с выборочной
+                buf_list.append(normalCorrelation_list[k])
+                print(f"M = {M} и k = {k} theoretical r_n = {normalCorrelation_list[k]:.4f}")
+            else:
+                # Для лагов > M считаем по формуле
+                theoretical = 0
+                for m in range(1, M + 1):
+                    theoretical += b_list[M][m - 1] * buf_list[k - m]
+                print(f"M = {M} и k = {k} theoretical r_n = {theoretical:.4f}")
+                buf_list.append(theoretical)
+        theoretical_list.append(buf_list)
+        print()
+    return theoretical_list
 
-    # Уравнения Юла-Уокера для автокорреляций
-    r = np.zeros(max_lag + 1)
-    r[0] = 1.0  # Нормировка
 
-    if order == 0:  # АР(0) - белый шум
-        return r[:max_lag + 1]
-
-    # Заполняем r[1..order] с помощью уравнений Юла-Уокера
-    for k in range(1, order + 1):
-        r[k] = -np.sum(ar_coeffs[:k] * r[k - 1::-1])
-
-    # Рекурсивно заполняем остальные значения
-    for k in range(order + 1, max_lag + 1):
-        r[k] = -np.sum(ar_coeffs * r[k - 1:k - order - 1:-1])
-
-    return r
-
-
-def plot_ar_models(process: np.array, max_order: int = 3, max_lag: int = 10):
+def findEps(theoretical_nkf_list, normalCorrelation_list, max_lag, model_type='AR'):
     """
-    Строит график сравнения выборочной НКФ с теоретическими НКФ моделей АР
+    Вычисление погрешности ε² для каждой модели.
+    model_type: 'AR' или 'MA' для корректного вывода.
     """
-    _, empirical_ncf = calculate_sample_correlation(process, max_lag)
-    lags = np.arange(0, max_lag + 1)
-
-    plt.figure(figsize=(12, 6))
-    plt.plot(lags, empirical_ncf, 'ko-', label='Выборочная НКФ')
-
-    for order in range(max_order + 1):
-        coeffs, noise_var = fit_ar_model(process, order)
-        theoretical_ncf = theoretical_ar_ncf(coeffs, max_lag)
-        error = np.mean((empirical_ncf - theoretical_ncf) ** 2)
-        plt.plot(lags, theoretical_ncf, '--', label=f'АР({order}), ошибка={error:.4f}')
-
-    plt.xlabel('Лаг')
-    plt.ylabel('НКФ')
-    plt.title('Сравнение выборочной и теоретических НКФ для моделей АР')
-    plt.legend()
-    plt.grid(True)
-    plt.show()
+    eps_list = []
+    for order in range(4):
+        if theoretical_nkf_list[order][0] is not None:
+            eps = 0
+            for k in range(1, max_lag + 1):
+                eps += (theoretical_nkf_list[order][k] - normalCorrelation_list[k]) ** 2
+            if model_type == 'AR':
+                print(f"M = {order} eps = {eps:.6f}")
+            else:
+                print(f"N = {order} eps = {eps:.6f}")
+            eps_list.append(eps)
+        else:
+            print(f"{model_type} модель порядка {order} не существует")
+            eps_list.append(None)
+            print()
+    return eps_list
 
 
-def print_ar_models_table(process: np.array, max_order: int = 3):
-    """
-    Выводит таблицу с коэффициентами моделей АР и ошибками
-    """
-    columns = ['B1', 'B2', 'B3', 'A0', 'error']
-    df = pd.DataFrame(index=range(max_order + 1), columns=columns)
-    df.index.name = 'M'
-
-    _, empirical_ncf = calculate_sample_correlation(process, 10)  # max_lag=10 для ошибки
-
-    best_order = 0
-    best_error = np.inf
-
-    for order in range(max_order + 1):
-        coeffs, noise_var = fit_ar_model(process, order)
-        theoretical_ncf = theoretical_ar_ncf(coeffs, 10)
-        error = np.mean((empirical_ncf - theoretical_ncf) ** 2)
-
-        row_data = []
-        for i in range(1, 4):
-            row_data.append(f"{coeffs[i]:.4f}" if i <= order else "NaN")
-        row_data.extend([f"{coeffs[0]:.4f}", error])
-        df.loc[order] = row_data
-
-        if error < best_error:
-            best_error = error
-            best_order = order
-
-    print("\nТаблица коэффициентов моделей АР и ошибок:")
-    print(tabulate(df, headers='keys', tablefmt='grid', floatfmt=".4f"))
-    print(f"\nЛучшая модель: АР({best_order}) с ошибкой {best_error:.4f}")
-
+# --- Основная функция для задания 2 ---
 
 def control_point_2():
-    """Пункт 3.2: Построение и сравнение моделей АР"""
-    process = read_file()
-    print("\nАнализ моделей авторегрессии:")
-    plot_ar_models(process)
-    print_ar_models_table(process)
+    print("\nПункт 2: Анализ моделей авторегрессии (АР)")
 
-
-def solve_ma_system(R, order):
-    """Решает систему уравнений для параметров СС(N) модели"""
-    from scipy.optimize import fsolve
-    import numpy as np
-
-    def equations(params):
-        eqs = []
-        alpha = params
-        # Уравнения для корреляционной функции
-        for k in range(order + 1):
-            sum_ = 0.0
-            for j in range(order + 1 - k):
-                sum_ += alpha[j] * alpha[j + k]
-            eqs.append(sum_ - R[k])
-        return eqs
-
-    # Начальное приближение
-    initial_guess = np.sqrt(np.abs(R[0])) * np.random.rand(order + 1)
-
-    try:
-        solution = fsolve(equations, initial_guess, xtol=1e-6, maxfev=1000)
-        # Проверка на вещественность решения
-        if np.all(np.isreal(solution)):
-            return solution
-        return None
-    except:
-        return None
-
-
-def theoretical_ma_ncf(alpha, max_lag):
-    """Вычисляет теоретическую НКФ для модели СС"""
-    r = np.zeros(max_lag + 1)
-    q = len(alpha) - 1  # Порядок модели
-
-    # Расчет корреляционной функции
-    for k in range(max_lag + 1):
-        if k > q: break
-        r[k] = np.sum(alpha[:q + 1 - k] * alpha[k:])
-
-    # Нормировка
-    r = r / r[0]
-    return r[:max_lag + 1]
-
-
-def calculate_model_error(empirical_ncf, theoretical_ncf):
-    """Вычисляет среднеквадратичную ошибку"""
-    return np.mean((empirical_ncf - theoretical_ncf) ** 2)
-
-
-def control_point_3():
-    """Пункт 3.3: Построение моделей скользящего среднего"""
     process = read_file()
     max_lag = 10
-    R, empirical_ncf = calculate_sample_correlation(process, max_lag)
+    R, ncf = calculate_correlations(process, max_lag)
 
-    # Таблица для результатов
-    results = {
-        'N': [],
-        'alpha0': [],
-        'alpha1': [],
-        'alpha2': [],
-        'alpha3': [],
-        'error': []
-    }
+    # Находим коэффициенты α и β для моделей АР(M), M=0..3
+    a_list, b_list = findBetasAR(R, 4)
 
+    # Рассчитываем теоретическую НКФ для моделей АР
+    theoretical_ncf_list = theoretical_normalCorrelationAR(b_list, ncf, max_lag)
+
+    # Рассчитываем погрешности моделей
+    eps_list = findEps(theoretical_ncf_list, ncf, max_lag, model_type='AR')
+
+    # Формируем таблицу для вывода
+    table_data = []
+    for M in range(4):
+        if a_list[M] is not None:
+            betas = b_list[M]
+            betas_str = ' '.join(f"{b:.4f}" for b in betas) if betas else "-"
+            table_data.append([
+                f"АР({M})",
+                f"{a_list[M]:.4f}",
+                betas_str,
+                f"{eps_list[M]:.6f}" if eps_list[M] is not None else "-"
+            ])
+        else:
+            table_data.append([f"АР({M})", "-", "-", "-"])
+
+    headers = ["Порядок модели", "α0", "β параметры", "ε²"]
+    print("\nТаблица моделей авторегрессии АР(M):")
+    print(tabulate(table_data, headers=headers, tablefmt="grid", stralign="center", numalign="center"))
+
+    # Выбираем лучшую модель по минимальной погрешности
+    filtered_eps = [(i, e) for i, e in enumerate(eps_list) if e is not None]
+    if filtered_eps:
+        best_order, best_eps = min(filtered_eps, key=lambda x: x[1])
+        print(f"\nРекомендуемая модель: АР({best_order}) с погрешностью ε² = {best_eps:.6f}")
+    else:
+        print("\nНе удалось построить работоспособную модель АР")
+
+
+# Функция системы нелинейных уравнений для модели СС(N)
+def equationsMA(seq, R, n):
+    if n == 0:
+        a0 = seq[0]
+        return a0 ** 2 - R[0]
+    elif n == 1:
+        a0, a1 = seq
+        return (a0 ** 2 + a1 ** 2 - R[0],
+                a0 * a1 - R[1])
+    elif n == 2:
+        a0, a1, a2 = seq
+        return (a0 ** 2 + a1 ** 2 + a2 ** 2 - R[0],
+                a0 * a1 + a1 * a2 - R[1],
+                a0 * a2 - R[2])
+    else:
+        a0, a1, a2, a3 = seq
+        return (a0 ** 2 + a1 ** 2 + a2 ** 2 + a3 ** 2 - R[0],
+                a0 * a1 + a1 * a2 + a2 * a3 - R[1],
+                a0 * a2 + a1 * a3 - R[2],
+                a0 * a3 - R[3])
+
+
+# Поиск коэффициентов α для моделей СС(N)
+def findAlphasMA(R):
+    ans_list = []
     for n in range(4):
-        # Решаем систему уравнений
-        solution = solve_ma_system(R, n)
+        # Начальное приближение: a0 = sqrt(R[0]), остальные 0
+        zeros = [0.0] * n
+        zeros.append(math.sqrt(R[0]))
+        zeros.reverse()
+        x0 = np.array(zeros)
+        res = fsolve(equationsMA, x0, args=(R, n))
+        norm = np.linalg.norm(equationsMA(res, R, n))
+        if norm < 1e-4:
+            ans_list.append(res.tolist())
+            print(f"Модель СС({n}) найдена: α = {[f'{v:.4f}' for v in res]}")
+        else:
+            ans_list.append([None])
+            print(f"Модель СС({n}) не существует")
+    print()
+    return ans_list
 
-        if solution is None or np.any(np.iscomplex(solution)):
-            # Модель не существует
-            results['N'].append(n)
-            results['alpha0'].append('Не существует')
-            for i in range(1, 4): results[f'alpha{i}'].append('-')
-            results['error'].append('-')
-            continue
+# Вычисление теоретической НКФ для моделей СС(N)
+def theoretical_normalCorrelationMA(a_list, normalCorrelation_list, max_lag):
+    theoretical_list = []
+    for N in range(4):
+        if a_list[N][0] is not None:
+            buf_list = []
+            for k in range(max_lag + 1):
+                if k <= N:
+                    # Для лагов <= N теоретическая НКФ совпадает с выборочной
+                    buf_list.append(normalCorrelation_list[k])
+                    print(f"N = {N} и k = {k} theoretical r_n = {normalCorrelation_list[k]:.4f}")
+                else:
+                    # Для лагов > N НКФ равна 0
+                    buf_list.append(0)
+                    print(f"N = {N} и k = {k} theoretical r_n = 0")
+            theoretical_list.append(buf_list)
+            print()
+        else:
+            theoretical_list.append([None])
+            print(f"N = {N} модель не существует\n")
+    return theoretical_list
 
-        # Расчет теоретической НКФ
-        theoretical_ncf = theoretical_ma_ncf(solution, max_lag)
-        error = calculate_model_error(empirical_ncf, theoretical_ncf)
+# Функция для вычисления погрешности ε² для моделей СС
+def findEpsMA(theoretical_nkf_list, normalCorrelation_list, max_lag):
+    eps_list = []
+    for order in range(4):
+        if theoretical_nkf_list[order][0] is not None:
+            eps = 0
+            for k in range(1, max_lag + 1):
+                eps += (theoretical_nkf_list[order][k] - normalCorrelation_list[k]) ** 2
+            print(f"N = {order} eps = {eps:.6f}")
+            eps_list.append(eps)
+        else:
+            print(f"Модель СС({order}) не существует")
+            eps_list.append(None)
+            print()
+    return eps_list
 
-        # Заполнение таблицы
-        results['N'].append(n)
-        for i in range(4):
-            key = f'alpha{i}'
-            if i <= n:
-                results[key].append(f"{solution[i]:.4f}")
-            else:
-                results[key].append('-')
-        results['error'].append(f"{error:.4f}")
+# Основная функция для третьего задания
+def control_point_3():
+    print("\nПункт 3: Анализ моделей скользящего среднего (СС)")
 
-    # Вывод таблицы
-    df = pd.DataFrame(results)
-    print("\nТаблица 3 – Модели скользящего среднего СС(N)")
-    print(tabulate(df, headers='keys', tablefmt='grid', showindex=False))
+    process = read_file()
+    max_lag = 10
+    R, ncf = calculate_correlations(process, max_lag)
 
+    # Находим коэффициенты α для моделей СС
+    a_list = findAlphasMA(R)
+
+    # Рассчитываем теоретическую НКФ для моделей СС
+    theoretical_ncf_list = theoretical_normalCorrelationMA(a_list, ncf, max_lag)
+
+    # Рассчитываем погрешности моделей
+    eps_list = findEpsMA(theoretical_ncf_list, ncf, max_lag)
+
+    # Формируем таблицу для вывода
+    table_data = []
+    for N in range(4):
+        if a_list[N][0] is not None:
+            alphas = a_list[N]
+            alphas_str = ' '.join(f"{a:.4f}" for a in alphas)
+            eps_str = f"{eps_list[N]:.6f}" if eps_list[N] is not None else "-"
+            table_data.append([
+                f"СС({N})",
+                alphas_str,
+                eps_str
+            ])
+        else:
+            table_data.append([f"СС({N})", "Модель не существует", "-"])
+
+    headers = ["Порядок модели", "Параметры модели (α0 ... αN)", "ε²"]
+    print("\nТаблица моделей скользящего среднего СС(N):")
+    print(tabulate(table_data, headers=headers, tablefmt="grid", stralign="center", numalign="center"))
+
+    # Выбираем лучшую модель по минимальной погрешности
+    filtered_eps = [(i, e) for i, e in enumerate(eps_list) if e is not None]
+    if filtered_eps:
+        best_order, best_eps = min(filtered_eps, key=lambda x: x[1])
+        print(f"\nРекомендуемая модель: СС({best_order}) с погрешностью ε² = {best_eps:.6f}")
+    else:
+        print("\nНе удалось построить работоспособную модель СС")
+
+# --- Запуск ---
 
 if __name__ == '__main__':
-    # control_point_1()
-    #control_point_2()
-     control_point_3()
+    # Запуск первого контрольного пункта
+    control_point_1()
+
+    # Запуск второго контрольного пункта (модели АР)
+    control_point_2()
+
+    # Третий пункт (модели СС) можно добавить аналогично
+    control_point_3()
