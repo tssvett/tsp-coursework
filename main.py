@@ -1,9 +1,8 @@
+import math
 import warnings
 
 import matplotlib.pyplot as plt
-from scipy.optimize import fsolve
 import numpy as np
-import math
 from tabulate import tabulate  # Для красивого вывода таблицы
 
 warnings.filterwarnings('ignore')  # Игнорируем предупреждения
@@ -267,8 +266,6 @@ def findEps(theoretical_nkf_list, normalCorrelation_list, max_lag, model_type='A
     return eps_list
 
 
-# --- Основная функция для задания 2 ---
-
 def control_point_2():
     print("\nПункт 2: Анализ моделей авторегрессии (АР)")
 
@@ -355,6 +352,7 @@ def findAlphasMA(R):
     print()
     return ans_list
 
+
 # Вычисление теоретической НКФ для моделей СС(N)
 def theoretical_normalCorrelationMA(a_list, normalCorrelation_list, max_lag):
     theoretical_list = []
@@ -377,6 +375,7 @@ def theoretical_normalCorrelationMA(a_list, normalCorrelation_list, max_lag):
             print(f"N = {N} модель не существует\n")
     return theoretical_list
 
+
 # Функция для вычисления погрешности ε² для моделей СС
 def findEpsMA(theoretical_nkf_list, normalCorrelation_list, max_lag):
     eps_list = []
@@ -392,6 +391,7 @@ def findEpsMA(theoretical_nkf_list, normalCorrelation_list, max_lag):
             eps_list.append(None)
             print()
     return eps_list
+
 
 # Основная функция для третьего задания
 def control_point_3():
@@ -436,19 +436,25 @@ def control_point_3():
         print(f"\nРекомендуемая модель: СС({best_order}) с погрешностью ε² = {best_eps:.6f}")
     else:
         print("\nНе удалось построить работоспособную модель СС")
+
+
 from scipy.optimize import fsolve
 import numpy as np
+
 
 # --- Функция для подсчёта ошибки ---
 def eps(theor, emp):
     # Сумма квадратов разностей по первым 11 лагам (k=0..10)
     return np.sum((theor[:11] - emp[:11]) ** 2)
 
+
 # --- Функции для смешанных моделей АРСС(M,N) ---
 
 def apcc11f(p):
     b1, a0, a1 = p
-    return korr[2] / korr[1] - b1, b1 * korr[1] + a0 ** 2 + a1 ** 2 + a1 * b1 * a0 - korr[0], b1 * korr[0] + a1 * a0 - korr[1]
+    return korr[2] / korr[1] - b1, b1 * korr[1] + a0 ** 2 + a1 ** 2 + a1 * b1 * a0 - korr[0], b1 * korr[0] + a1 * a0 - \
+           korr[1]
+
 
 def apcc11(korr):
     print("АРСС(1,1)")
@@ -472,9 +478,13 @@ def apcc11(korr):
         else:
             print("Не устойчива")
 
+
 def apcc12f(p):
     b1, a0, a1, a2 = p
-    return korr[3] / korr[2] - b1, b1 * korr[1] + a0 ** 2 + a1 ** 2 + a1 * b1 * a0 + a2 * b1 * b1 * a0 + a2 * b1 * a1 + a2 ** 2 - korr[0], b1 * korr[0] + a1 * a0 + a0 * a2 * b1 + a1 * a2 - korr[1], b1 * korr[1] + a2 * a0 - korr[2]
+    return korr[3] / korr[2] - b1, b1 * korr[
+        1] + a0 ** 2 + a1 ** 2 + a1 * b1 * a0 + a2 * b1 * b1 * a0 + a2 * b1 * a1 + a2 ** 2 - korr[0], b1 * korr[
+               0] + a1 * a0 + a0 * a2 * b1 + a1 * a2 - korr[1], b1 * korr[1] + a2 * a0 - korr[2]
+
 
 def apcc12(korr):
     print("АРСС(1,2)")
@@ -499,9 +509,15 @@ def apcc12(korr):
         else:
             print("Не устойчива")
 
+
 def apcc13f(p):
     b1, a0, a1, a2, a3 = p
-    return korr[4] / korr[3] - b1, -korr[0] + b1 * korr[1] + a0 ** 2 + a1 * b1 * a0 + a1 ** 2 + a2 * b1 * b1 * a0 + a2 * b1 * a1 + a2 ** 2 + a3 * (b1 ** 3) * a0 + a3 * b1 * b1 * a1 + a3 * b1 * a2 + a3 ** 2, -korr[1] + b1 * korr[0] + a1 * a0 + a2 * b1 * a0 + a2 * a1 + a3 * b1 * b1 * a0 + a3 * b1 * a1 + a3 * a2, -korr[2] + b1 * korr[1] + a2 * a0 + a3 * b1 * a0 + a3 * a1, -korr[3] + b1 * korr[2] + a3 * a0
+    return korr[4] / korr[3] - b1, -korr[0] + b1 * korr[
+        1] + a0 ** 2 + a1 * b1 * a0 + a1 ** 2 + a2 * b1 * b1 * a0 + a2 * b1 * a1 + a2 ** 2 + a3 * (
+                   b1 ** 3) * a0 + a3 * b1 * b1 * a1 + a3 * b1 * a2 + a3 ** 2, -korr[1] + b1 * korr[
+               0] + a1 * a0 + a2 * b1 * a0 + a2 * a1 + a3 * b1 * b1 * a0 + a3 * b1 * a1 + a3 * a2, -korr[2] + b1 * korr[
+               1] + a2 * a0 + a3 * b1 * a0 + a3 * a1, -korr[3] + b1 * korr[2] + a3 * a0
+
 
 def apcc13(korr):
     print("АРСС(1,3)")
@@ -527,9 +543,12 @@ def apcc13(korr):
         else:
             print("Не устойчива")
 
+
 def apcc21f(p):
     b1, b2, a0, a1 = p
-    return b1 * korr[1] + b2 * korr[0] - korr[2], b1 * korr[2] + b2 * korr[1] - korr[3], -korr[0] + b1 * korr[1] + b2 * korr[2] + a0 ** 2 + a1 * b1 * a0 + a1 ** 2, -korr[1] + b1 * korr[0] + b2 * korr[1] + a1 * a0
+    return b1 * korr[1] + b2 * korr[0] - korr[2], b1 * korr[2] + b2 * korr[1] - korr[3], -korr[0] + b1 * korr[1] + b2 * \
+           korr[2] + a0 ** 2 + a1 * b1 * a0 + a1 ** 2, -korr[1] + b1 * korr[0] + b2 * korr[1] + a1 * a0
+
 
 def apcc21(korr):
     print("АРСС(2,1)")
@@ -554,9 +573,13 @@ def apcc21(korr):
         else:
             print("Не устойчива")
 
+
 def apcc22f(p):
     b1, b2, a0, a1, a2 = p
-    return b1 * korr[2] + b2 * korr[1] - korr[3], b1 * korr[3] + b2 * korr[2] - korr[4], -korr[0] + b1 * korr[1] + b2 * korr[2] + a0 ** 2 + a1 * b1 * a0 + a1 ** 2 + a2 * (b1 * (b1 * a0 + a1) + b2 * a0 + a2), -korr[1] + b1 * korr[0] + b2 * korr[1] + a1 * a0 + a2 * (b1 * a0 + a1), -korr[2] + b1 * korr[1] + b2 * korr[0] + a2 * a0
+    return b1 * korr[2] + b2 * korr[1] - korr[3], b1 * korr[3] + b2 * korr[2] - korr[4], -korr[0] + b1 * korr[1] + b2 * \
+           korr[2] + a0 ** 2 + a1 * b1 * a0 + a1 ** 2 + a2 * (b1 * (b1 * a0 + a1) + b2 * a0 + a2), -korr[1] + b1 * korr[
+               0] + b2 * korr[1] + a1 * a0 + a2 * (b1 * a0 + a1), -korr[2] + b1 * korr[1] + b2 * korr[0] + a2 * a0
+
 
 def apcc22(korr):
     print("АРСС(2,2)")
@@ -582,9 +605,16 @@ def apcc22(korr):
         else:
             print("Не устойчива")
 
+
 def apcc23f(p):
     b1, b2, a0, a1, a2, a3 = p
-    return b1 * korr[3] + b2 * korr[2] - korr[4], b1 * korr[4] + b2 * korr[3] - korr[5], -korr[0] + b1 * korr[1] + b2 * korr[2] + a0 ** 2 + a1 * b1 * a0 + a1 ** 2 + a2 * (b1 * (b1 * a0 + a1) + b2 * a0 + a2) + a3 * (b1 * (b1 * (b1 * a0 + a1) + b2 * a0 + a2) + b2 * (b1 * a0 + a1) + a3), -korr[1] + b1 * korr[0] + b2 * korr[1] + a1 * a0 + a2 * (b1 * a0 + a1) + a3 * (b1 * (b1 * a0 + a1) + b2 * a0 + a2), -korr[2] + b1 * korr[1] + b2 * korr[0] + a2 * a0 + a3 * (b1 * a0 + a1), -korr[3] + b1 * korr[2] + b2 * korr[1] + a3 * a0
+    return b1 * korr[3] + b2 * korr[2] - korr[4], b1 * korr[4] + b2 * korr[3] - korr[5], -korr[0] + b1 * korr[1] + b2 * \
+           korr[2] + a0 ** 2 + a1 * b1 * a0 + a1 ** 2 + a2 * (b1 * (b1 * a0 + a1) + b2 * a0 + a2) + a3 * (
+                   b1 * (b1 * (b1 * a0 + a1) + b2 * a0 + a2) + b2 * (b1 * a0 + a1) + a3), -korr[1] + b1 * korr[
+               0] + b2 * korr[1] + a1 * a0 + a2 * (b1 * a0 + a1) + a3 * (b1 * (b1 * a0 + a1) + b2 * a0 + a2), -korr[
+        2] + b1 * korr[1] + b2 * korr[0] + a2 * a0 + a3 * (b1 * a0 + a1), -korr[3] + b1 * korr[2] + b2 * korr[
+               1] + a3 * a0
+
 
 def apcc23(korr):
     print("АРСС(2,3)")
@@ -611,9 +641,13 @@ def apcc23(korr):
         else:
             print("Не устойчива")
 
+
 def apcc31f(p):
     b1, b2, b3, a0, a1 = p
-    return -korr[2] + b1 * korr[1] + b2 * korr[0], -korr[3] + b1 * korr[2] + b2 * korr[1] + b3 * korr[0], -korr[4] + b1 * korr[3] + b2 * korr[2] + b3 * korr[1], -korr[0] + b1 * korr[1] + b2 * korr[2] + b3 * korr[3] + a0 ** 2 + a1 * (b1 * a0 + a1), -korr[1] + b1 * korr[0] + b2 * korr[1] + b3 * korr[2] + a1 * a0
+    return -korr[2] + b1 * korr[1] + b2 * korr[0], -korr[3] + b1 * korr[2] + b2 * korr[1] + b3 * korr[0], -korr[
+        4] + b1 * korr[3] + b2 * korr[2] + b3 * korr[1], -korr[0] + b1 * korr[1] + b2 * korr[2] + b3 * korr[
+               3] + a0 ** 2 + a1 * (b1 * a0 + a1), -korr[1] + b1 * korr[0] + b2 * korr[1] + b3 * korr[2] + a1 * a0
+
 
 def apcc31(korr):
     print("АРСС(3,1)")
@@ -639,9 +673,15 @@ def apcc31(korr):
         else:
             print("Не устойчива")
 
+
 def apcc32f(p):
     b1, b2, b3, a0, a1, a2 = p
-    return -korr[3] + b1 * korr[2] + b2 * korr[1] + b3 * korr[0], -korr[4] + b1 * korr[3] + b2 * korr[2] + b3 * korr[1], -korr[5] + b1 * korr[4] + b2 * korr[3] + b3 * korr[2], -korr[0] + b1 * korr[1] + b2 * korr[2] + b3 * korr[3] + a0 ** 2 + a1 * (b1 * a0 + a1) + a2 * (b1 * (b1 * a0 + a1) + b2 * a0 + a2), -korr[1] + b1 * korr[0] + b2 * korr[1] + b3 * korr[2] + a1 * a0 + a2 * (b1 * a0 + a1), -korr[2] + b1 * korr[1] + b2 * korr[0] + b3 * korr[1] + a2 * a0
+    return -korr[3] + b1 * korr[2] + b2 * korr[1] + b3 * korr[0], -korr[4] + b1 * korr[3] + b2 * korr[2] + b3 * korr[
+        1], -korr[5] + b1 * korr[4] + b2 * korr[3] + b3 * korr[2], -korr[0] + b1 * korr[1] + b2 * korr[2] + b3 * korr[
+               3] + a0 ** 2 + a1 * (b1 * a0 + a1) + a2 * (b1 * (b1 * a0 + a1) + b2 * a0 + a2), -korr[1] + b1 * korr[
+               0] + b2 * korr[1] + b3 * korr[2] + a1 * a0 + a2 * (b1 * a0 + a1), -korr[2] + b1 * korr[1] + b2 * korr[
+               0] + b3 * korr[1] + a2 * a0
+
 
 def apcc32(korr):
     print("АРСС(3,2)")
@@ -668,9 +708,17 @@ def apcc32(korr):
         else:
             print("Не устойчива")
 
+
 def apcc33f(p):
     b1, b2, b3, a0, a1, a2, a3 = p
-    return -korr[4] + b1 * korr[3] + b2 * korr[2] + b3 * korr[1], -korr[5] + b1 * korr[4] + b2 * korr[3] + b3 * korr[2], -korr[6] + b1 * korr[5] + b2 * korr[4] + b3 * korr[3], -korr[0] + b1 * korr[1] + b2 * korr[2] + b3 * korr[3] + a0 ** 2 + a1 * (b1 * a0 + a1) + a2 * (b1 * (b1 * a0 + a1) + b2 * a0 + a2) + a3 * (b1 * (b1 * (b1 * a0 + a1) + b2 * a0 + a2) + b2 * (b1 * a0 + a1) + b3 * a0 + a3), -korr[1] + b1 * korr[0] + b2 * korr[1] + b3 * korr[2] + a1 * a0 + a2 * (b1 * a0 + a1) + a3 * (b1 * (b1 * a0 + a1) + b2 * a0 + a2), -korr[2] + b1 * korr[1] + b2 * korr[0] + b3 * korr[1] + a2 * a0 + a3 * (b1 * a0 + a1), -korr[3] + b1 * korr[2] + b2 * korr[1] + b3 * korr[0] + a3 * a0
+    return -korr[4] + b1 * korr[3] + b2 * korr[2] + b3 * korr[1], -korr[5] + b1 * korr[4] + b2 * korr[3] + b3 * korr[
+        2], -korr[6] + b1 * korr[5] + b2 * korr[4] + b3 * korr[3], -korr[0] + b1 * korr[1] + b2 * korr[2] + b3 * korr[
+               3] + a0 ** 2 + a1 * (b1 * a0 + a1) + a2 * (b1 * (b1 * a0 + a1) + b2 * a0 + a2) + a3 * (
+                   b1 * (b1 * (b1 * a0 + a1) + b2 * a0 + a2) + b2 * (b1 * a0 + a1) + b3 * a0 + a3), -korr[1] + b1 * \
+           korr[0] + b2 * korr[1] + b3 * korr[2] + a1 * a0 + a2 * (b1 * a0 + a1) + a3 * (
+                   b1 * (b1 * a0 + a1) + b2 * a0 + a2), -korr[2] + b1 * korr[1] + b2 * korr[0] + b3 * korr[
+               1] + a2 * a0 + a3 * (b1 * a0 + a1), -korr[3] + b1 * korr[2] + b2 * korr[1] + b3 * korr[0] + a3 * a0
+
 
 def apcc33(korr):
     print("АРСС(3,3)")
@@ -698,7 +746,6 @@ def apcc33(korr):
         else:
             print("Не устойчива")
 
-# --- Основная функция для вызова всех моделей ---
 
 def control_point_4():
     print("\nПункт 4: Анализ смешанных моделей АРСС(M,N)")
@@ -727,17 +774,19 @@ def control_point_4():
     apcc33(korr)
     print()
 
+
 def model(mod):
     mod1 = mod[1000:6000]
     mo = np.mean(mod1)
     ds = np.var(mod1, ddof=1)
-    korre = [np.mean((mod1[:len(mod1)-k] - mo) * (mod1[k:] - mo)) for k in range(11)]
+    korre = [np.mean((mod1[:len(mod1) - k] - mo) * (mod1[k:] - mo)) for k in range(11)]
     normkore = korre / korre[0]
     return mod1, mo, ds, korre, normkore
 
+
 def plot_ncf_compare(title, normcorr, normkorrt, normkorrm, filename):
     x = np.arange(0, 11, 1)
-    plt.figure(figsize=(8,5))
+    plt.figure(figsize=(8, 5))
     plt.plot(x, normcorr[:11], 'ko-', label="Исходный процесс")
     plt.plot(x, normkorrt[:11], 'bs--', label="Теоретическая НКФ")
     plt.plot(x, normkorrm[:11], 'r^-.', label="Моделированный процесс")
@@ -750,26 +799,17 @@ def plot_ncf_compare(title, normcorr, normkorrt, normkorrm, filename):
     plt.savefig(filename)
     plt.show()
 
-def control_point_5():
 
+def control_point_5():
     process = read_file()
     max_lag = 10
     korr, normcorr = calculate_correlations(process, max_lag)
     m = np.mean(process)
     d = korr[0]
-
-    print("Исходный процесс")
-    print("Среднее", m)
-    print("Дисперсия", d)
-    print("CKO", np.sqrt(d))
-    for i in range(11):
-        print("НКФ", i, normcorr[i])
-
-    # Генерируем белый шум
+    s = np.sqrt(d)
     ksi = np.random.normal(0, 1, size=6000)
 
-    # ----- Модель АР(3) -----
-    # Замените на ваши параметры (примерные)
+    # --- Модель АР(3) ---
     b1, b2, b3 = 0.4818, -0.3958, -0.2517
     a0 = 16.1297
     mdap3 = m * (1 - b1 - b2 - b3)
@@ -778,34 +818,30 @@ def control_point_5():
     modap3[1] = b1 * modap3[0] + a0 * ksi[1] + mdap3
     modap3[2] = b1 * modap3[1] + b2 * modap3[0] + a0 * ksi[2] + mdap3
     for i in range(3, 6000):
-        modap3[i] = b1 * modap3[i-1] + b2 * modap3[i-2] + b3 * modap3[i-3] + a0 * ksi[i] + mdap3
+        modap3[i] = b1 * modap3[i - 1] + b2 * modap3[i - 2] + b3 * modap3[i - 3] + a0 * ksi[i] + mdap3
     modap3, map3, dap3, korrap3, normkorrap3 = model(modap3)
-    # Теоретическая НКФ (по рекуррентной формуле)
     normkorrtap3 = np.zeros(11)
     normkorrtap3[0] = 1
     normkorrtap3[1] = b1
-    normkorrtap3[2] = b1*normkorrtap3[1] + b2
+    normkorrtap3[2] = b1 * normkorrtap3[1] + b2
     for i in range(3, 11):
-        normkorrtap3[i] = b1*normkorrtap3[i-1] + b2*normkorrtap3[i-2] + b3*normkorrtap3[i-3]
-    plot_ncf_compare("Сравнение НКФ для АР(3)", normcorr, normkorrtap3, normkorrap3, "ar3_ncf.png")
+        normkorrtap3[i] = b1 * normkorrtap3[i - 1] + b2 * normkorrtap3[i - 2] + b3 * normkorrtap3[i - 3]
 
-    # ----- Модель СС(1) -----
-    a0, a1, a2 = 19.5061, 9.7507, 0.0
+    # --- Модель СС(1) ---
+    a0_cc1, a1_cc1, a2_cc1 = 19.5061, 9.7507, 0.0
     modcc1 = np.zeros(6000)
-    modcc1[0] = a0 * ksi[0] + m
-    modcc1[1] = a0 * ksi[1] + a1 * ksi[0] + m
+    modcc1[0] = a0_cc1 * ksi[0] + m
+    modcc1[1] = a0_cc1 * ksi[1] + a1_cc1 * ksi[0] + m
     for i in range(2, 6000):
-        modcc1[i] = a0 * ksi[i] + a1 * ksi[i-1] + a2 * ksi[i-2] + m
+        modcc1[i] = a0_cc1 * ksi[i] + a1_cc1 * ksi[i - 1] + a2_cc1 * ksi[i - 2] + m
     modcc1, mcc1, dcc1, korrcc1, normkorrcc1 = model(modcc1)
-    # Теоретическая НКФ для СС(1)
     normkorrtcc1 = np.zeros(11)
-    normkorrtcc1[0] = (a0**2 + a1**2) / (a0**2 + a1**2)
-    normkorrtcc1[1] = (a0*a1) / (a0**2 + a1**2)
+    normkorrtcc1[0] = (a0_cc1 ** 2 + a1_cc1 ** 2) / (a0_cc1 ** 2 + a1_cc1 ** 2)
+    normkorrtcc1[1] = (a0_cc1 * a1_cc1) / (a0_cc1 ** 2 + a1_cc1 ** 2)
     for i in range(2, 11):
         normkorrtcc1[i] = 0
-    plot_ncf_compare("Сравнение НКФ для СС(1)", normcorr, normkorrtcc1, normkorrcc1, "cc1_ncf.png")
 
-    # ----- Модель АРСС(2,3) -----
+    # --- Модель АРСС(2,3) ---
     b1, b2, b3 = 0.9675, -0.7111, 0.0
     a0, a1, a2, a3 = 15.9646, -8.4029, 0.3202, 0.6552
     md23 = m * (1 - b1 - b2 - b3)
@@ -813,35 +849,110 @@ def control_point_5():
     mod23[0] = a0 * ksi[0] + md23
     mod23[1] = b1 * mod23[0] + a0 * ksi[1] + a1 * ksi[0] + md23
     mod23[2] = b1 * mod23[1] + b2 * mod23[0] + a0 * ksi[2] + a1 * ksi[1] + a2 * ksi[0] + md23
-    mod23[3] = b1 * mod23[2] + b2 * mod23[1] + b3 * mod23[0] + a0 * ksi[3] + a1 * ksi[2] + a2 * ksi[1] + a3 * ksi[0] + md23
+    mod23[3] = b1 * mod23[2] + b2 * mod23[1] + b3 * mod23[0] + a0 * ksi[3] + a1 * ksi[2] + a2 * ksi[1] + a3 * ksi[
+        0] + md23
     for i in range(4, 6000):
-        mod23[i] = b1 * mod23[i-1] + b2 * mod23[i-2] + b3 * mod23[i-3] + a0 * ksi[i] + a1 * ksi[i-1] + a2 * ksi[i-2] + a3 * ksi[i-3] + md23
+        mod23[i] = b1 * mod23[i - 1] + b2 * mod23[i - 2] + b3 * mod23[i - 3] + a0 * ksi[i] + a1 * ksi[i - 1] + a2 * ksi[
+            i - 2] + a3 * ksi[i - 3] + md23
     mod23, m23, d23, korr23, normkorr23 = model(mod23)
-    # Теоретическая НКФ для АРСС(2,3) (рекуррентно)
     normkorrt23 = np.zeros(11)
     normkorrt23[0] = 1
     normkorrt23[1] = b1
-    normkorrt23[2] = b1*normkorrt23[1] + b2
+    normkorrt23[2] = b1 * normkorrt23[1] + b2
     for i in range(3, 11):
-        normkorrt23[i] = b1*normkorrt23[i-1] + b2*normkorrt23[i-2] + b3*normkorrt23[i-3]
+        normkorrt23[i] = b1 * normkorrt23[i - 1] + b2 * normkorrt23[i - 2] + b3 * normkorrt23[i - 3]
+
+    # --- Таблица параметров ---
+    table = [
+        ["Параметры", "Исходный процесс", "АР(3) Теор.", "АР(3) Модел.", "СС(1) Теор.", "СС(1) Модел.",
+         "АРСС(2,3) Теор.", "АРСС(2,3) Модел."],
+        ["M(ξ)", f"{m:.4f}", f"{m:.4f}", f"{map3:.4f}", f"{m:.4f}", f"{mcc1:.4f}", f"{m:.4f}", f"{m23:.4f}"],
+        ["D(ξ)", f"{d:.4f}", f"{d:.4f}", f"{dap3:.4f}", f"{d:.4f}", f"{dcc1:.4f}", f"{d:.4f}", f"{d23:.4f}"],
+        ["√D(ξ)", f"{np.sqrt(d):.4f}", f"{np.sqrt(d):.4f}", f"{np.sqrt(dap3):.4f}", f"{np.sqrt(d):.4f}",
+         f"{np.sqrt(dcc1):.4f}", f"{np.sqrt(d):.4f}", f"{np.sqrt(d23):.4f}"],
+    ]
+    # Добавим строки НКФ
+    for i in range(11):
+        table.append([
+            f"r({i})",
+            f"{normcorr[i]:.4f}",
+            f"{normkorrtap3[i]:.4f}",
+            f"{normkorrap3[i]:.4f}",
+            f"{normkorrtcc1[i]:.4f}",
+            f"{normkorrcc1[i]:.4f}",
+            f"{normkorrt23[i]:.4f}",
+            f"{normkorr23[i]:.4f}"
+        ])
+    # Добавим строки с погрешностями
+    table.append([
+        "Погрешность",
+        "",
+        f"{eps(normkorrtap3, normcorr):.4f}",
+        f"{eps(normkorrap3, normcorr):.4f}",
+        f"{eps(normkorrtcc1, normcorr):.4f}",
+        f"{eps(normkorrcc1, normcorr):.4f}",
+        f"{eps(normkorrt23, normcorr):.4f}",
+        f"{eps(normkorr23, normcorr):.4f}"
+    ])
+    print("\nСравнительная таблица параметров и НКФ:")
+    print(tabulate(table, headers="firstrow", tablefmt="grid", numalign="center", stralign="center"))
+
+    # --- Графики ---
+    plot_ncf_compare("Сравнение НКФ для АР(3)", normcorr, normkorrtap3, normkorrap3, "ar3_ncf.png")
+    plot_ncf_compare("Сравнение НКФ для СС(1)", normcorr, normkorrtcc1, normkorrcc1, "cc1_ncf.png")
     plot_ncf_compare("Сравнение НКФ для АРСС(2,3)", normcorr, normkorrt23, normkorr23, "arcc23_ncf.png")
+    control_point_5_simulation_fragment()
 
-    # Выводим параметры и ошибки для отчёта
-    print("\nАР(3):")
-    print("Среднее", map3, "Дисперсия", dap3)
-    print("Погрешность (теор/мод):", eps(normkorrtap3, normcorr), eps(normkorrap3, normcorr))
-    print("СС(1):")
-    print("Среднее", mcc1, "Дисперсия", dcc1)
-    print("Погрешность (теор/мод):", eps(normkorrtcc1, normcorr), eps(normkorrcc1, normcorr))
-    print("АРСС(2,3):")
-    print("Среднее", m23, "Дисперсия", d23)
-    print("Погрешность (теор/мод):", eps(normkorrt23, normcorr), eps(normkorr23, normcorr))
 
-# --- Запуск ---
+def simulate_arcc23(m, b1, b2, a0, a1, a2, a3, length=6000, burn_in=1000):
+    """Смоделировать процесс АРСС(2,3)"""
+    ksi = np.random.normal(0, 1, size=length)
+    md = m * (1 - b1 - b2)
+    eta = np.zeros(length)
+    eta[0] = a0 * ksi[0] + md
+    eta[1] = b1 * eta[0] + a0 * ksi[1] + a1 * ksi[0] + md
+    eta[2] = b1 * eta[1] + b2 * eta[0] + a0 * ksi[2] + a1 * ksi[1] + a2 * ksi[0] + md
+    eta[3] = b1 * eta[2] + b2 * eta[1] + a0 * ksi[3] + a1 * ksi[2] + a2 * ksi[1] + a3 * ksi[0] + md
+    for i in range(4, length):
+        eta[i] = (b1 * eta[i - 1] + b2 * eta[i - 2] +
+                  a0 * ksi[i] + a1 * ksi[i - 1] + a2 * ksi[i - 2] + a3 * ksi[i - 3] + md)
+    # Отбрасываем первые burn_in отсчётов
+    return eta[burn_in:]
+
+
+def plot_process_fragment(process, points_to_plot=150):
+    """Визуализация фрагмента случайного процесса"""
+    mean_value = np.mean(process)
+    std_dev = np.std(process, ddof=1)
+    plt.figure(figsize=(10, 6))
+    plt.plot(process[:points_to_plot], label='Смоделированный процесс', color='blue', alpha=0.7)
+    plt.axhline(mean_value, color='orange', label=f'Среднее = {mean_value:.3f}', linewidth=2)
+    plt.axhline(mean_value + std_dev, color='green', linestyle='--', label=f'Среднее + σ = {mean_value + std_dev:.3f}')
+    plt.axhline(mean_value - std_dev, color='red', linestyle='--', label=f'Среднее - σ = {mean_value - std_dev:.3f}')
+    plt.ylabel('Значение процесса')
+    plt.xlabel('Время, отсчёты')
+    plt.title('Фрагмент смоделированного процесса по АРСС(2,3)')
+    plt.legend(loc='upper right')
+    plt.grid(True, linestyle=':', alpha=0.5)
+    plt.tight_layout()
+    plt.show()
+
+
+def control_point_5_simulation_fragment():
+    m = 40.7955  # среднее исходного процесса
+    b1, b2 = 0.9675, -0.7111
+    a0, a1, a2, a3 = 15.9646, -8.4029, 0.3202, 0.6552
+
+    # Смоделировать процесс
+    process_sim = simulate_arcc23(m, b1, b2, a0, a1, a2, a3)
+
+    # Построить фрагмент
+    plot_process_fragment(process_sim, points_to_plot=150)
+
 
 if __name__ == '__main__':
-    #control_point_1()
-    #control_point_2()
-    #control_point_3()
-    #control_point_4()
+    # control_point_1()
+    # control_point_2()
+    # control_point_3()
+    # control_point_4()
     control_point_5()
